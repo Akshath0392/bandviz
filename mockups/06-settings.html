@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>BandViz – Settings</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f0f2f5;color:#1a1a2e;display:flex;min-height:100vh}
+    .sidebar{width:220px;background:#1a1a2e;display:flex;flex-direction:column;flex-shrink:0;position:fixed;top:0;left:0;bottom:0}
+    .sidebar-logo{padding:20px 24px;font-size:18px;font-weight:700;color:#fff;border-bottom:1px solid #2d2d4e;letter-spacing:.5px}
+    .sidebar-logo span{color:#4f8ef7}
+    .sidebar-nav{padding:16px 0;flex:1}
+    .nav-section-label{font-size:10px;font-weight:600;color:#6b7280;letter-spacing:1px;text-transform:uppercase;padding:8px 24px 4px}
+    .nav-item{display:flex;align-items:center;gap:10px;padding:10px 24px;color:#9ca3af;font-size:14px;cursor:pointer;border-left:3px solid transparent;text-decoration:none}
+    .nav-item:hover{background:#2d2d4e;color:#e5e7eb}
+    .nav-item.active{background:#1e3a5f;color:#4f8ef7;border-left-color:#4f8ef7;font-weight:600}
+    .nav-item .icon{font-size:16px;width:20px;text-align:center}
+    .sidebar-footer{padding:16px 24px;border-top:1px solid #2d2d4e;display:flex;align-items:center;gap:10px}
+    .avatar-small{width:32px;height:32px;border-radius:50%;background:#4f8ef7;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#fff;flex-shrink:0}
+    .footer-user-name{font-size:13px;color:#d1d5db;font-weight:500}
+    .footer-user-role{font-size:11px;color:#6b7280}
+    .main{margin-left:220px;flex:1;display:flex;flex-direction:column}
+    .topbar{background:#fff;padding:14px 28px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #e5e7eb;position:sticky;top:0;z-index:10}
+    .topbar-left h1{font-size:18px;font-weight:700;color:#111827}
+    .topbar-left p{font-size:13px;color:#6b7280;margin-top:1px}
+    .topbar-right{display:flex;align-items:center;gap:12px}
+    .btn{padding:8px 16px;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;border:none;transition:all .15s;text-decoration:none;display:inline-flex;align-items:center;gap:6px}
+    .btn-primary{background:#4f8ef7;color:#fff}
+    .btn-primary:hover{background:#3a7bd5}
+    .btn-outline{background:#fff;color:#374151;border:1px solid #d1d5db}
+    .btn-outline:hover{background:#f9fafb}
+    .btn-danger{background:#fef2f2;color:#dc2626;border:1px solid #fecaca}
+    .content{padding:24px 28px;display:grid;grid-template-columns:220px 1fr;gap:24px;align-items:start}
+    /* SETTINGS NAV */
+    .settings-nav{background:#fff;border-radius:12px;border:1px solid #e5e7eb;overflow:hidden;position:sticky;top:78px}
+    .sn-item{display:flex;align-items:center;gap:10px;padding:12px 16px;font-size:13px;color:#6b7280;cursor:pointer;border-left:3px solid transparent;text-decoration:none}
+    .sn-item:hover{background:#f9fafb;color:#374151}
+    .sn-item.active{background:#eff6ff;color:#1d4ed8;border-left-color:#4f8ef7;font-weight:600}
+    .sn-icon{font-size:15px;width:18px;text-align:center}
+    .sn-divider{height:1px;background:#f3f4f6;margin:4px 0}
+    /* MAIN CONTENT */
+    .settings-main{display:flex;flex-direction:column;gap:20px}
+    /* SECTION CARD */
+    .section-card{background:#fff;border-radius:12px;border:1px solid #e5e7eb;overflow:hidden}
+    .sc-header{padding:16px 20px;border-bottom:1px solid #f3f4f6;display:flex;align-items:center;justify-content:space-between}
+    .sc-title{font-size:14px;font-weight:700;color:#111827}
+    .sc-sub{font-size:12px;color:#9ca3af;margin-top:2px}
+    .sc-body{padding:0}
+    /* DEV TABLE */
+    .dev-table{width:100%;border-collapse:collapse}
+    .dev-table th{padding:9px 16px;font-size:11px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.5px;background:#fafafa;border-bottom:2px solid #e5e7eb;text-align:left}
+    .dev-table td{padding:10px 16px;font-size:13px;color:#374151;border-bottom:1px solid #f3f4f6;vertical-align:middle}
+    .dev-table tr:last-child td{border-bottom:none}
+    .dev-table tr:hover td{background:#fafafa}
+    .dev-avatar-sm{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;flex-shrink:0}
+    .dev-name-cell{display:flex;align-items:center;gap:8px}
+    .capacity-input{width:65px;padding:5px 8px;border-radius:6px;border:1px solid #d1d5db;font-size:12px;text-align:center;color:#374151}
+    .capacity-input:focus{outline:none;border-color:#4f8ef7;box-shadow:0 0 0 2px rgba(79,142,247,.1)}
+    .role-select{padding:5px 8px;border-radius:6px;border:1px solid #d1d5db;font-size:12px;color:#374151;background:#fff}
+    .action-btns{display:flex;gap:6px}
+    .btn-icon{width:28px;height:28px;border-radius:6px;border:1px solid #d1d5db;background:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:13px}
+    .btn-icon:hover{background:#f3f4f6}
+    .btn-icon.del:hover{background:#fee2e2;border-color:#fca5a5}
+    .active-dot{width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block}
+    .inactive-dot{width:8px;height:8px;border-radius:50%;background:#d1d5db;display:inline-block}
+    /* PROJECT TABLE */
+    .proj-table{width:100%;border-collapse:collapse}
+    .proj-table th{padding:9px 16px;font-size:11px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.5px;background:#fafafa;border-bottom:2px solid #e5e7eb;text-align:left}
+    .proj-table td{padding:10px 16px;font-size:13px;color:#374151;border-bottom:1px solid #f3f4f6;vertical-align:middle}
+    .proj-table tr:last-child td{border-bottom:none}
+    .proj-table tr:hover td{background:#fafafa}
+    .proj-color{width:12px;height:12px;border-radius:3px;display:inline-block;margin-right:6px}
+    /* FORM ROWS */
+    .form-row{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid #f3f4f6}
+    .form-row:last-child{border-bottom:none}
+    .form-label{font-size:13px;font-weight:500;color:#374151}
+    .form-sub{font-size:11px;color:#9ca3af;margin-top:3px}
+    .form-input{padding:7px 10px;border-radius:8px;border:1px solid #d1d5db;font-size:13px;color:#374151;width:200px}
+    .form-input:focus{outline:none;border-color:#4f8ef7}
+    .toggle{width:38px;height:22px;border-radius:99px;background:#4f8ef7;position:relative;cursor:pointer;flex-shrink:0}
+    .toggle::after{content:'';position:absolute;width:16px;height:16px;border-radius:50%;background:#fff;top:3px;right:3px}
+    .toggle.off{background:#d1d5db}
+    .toggle.off::after{right:auto;left:3px}
+    select.form-select{padding:7px 10px;border-radius:8px;border:1px solid #d1d5db;font-size:13px;color:#374151;background:#fff;width:200px}
+    /* LEAVE TYPES */
+    .leave-type-row{display:flex;align-items:center;gap:12px;padding:12px 20px;border-bottom:1px solid #f3f4f6}
+    .leave-type-row:last-child{border-bottom:none}
+    .lt-color{width:14px;height:14px;border-radius:3px;flex-shrink:0}
+    .lt-name{font-size:13px;font-weight:500;color:#374151;flex:1}
+    .lt-days{font-size:12px;color:#6b7280}
+    .lt-badge{padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600}
+    .ltb-paid{background:#dcfce7;color:#166534}
+    .ltb-unpaid{background:#f3f4f6;color:#6b7280}
+    /* AVATAR COLORS */
+    .av-1{background:#6366f1}.av-2{background:#ec4899}.av-3{background:#14b8a6}.av-4{background:#f59e0b}.av-5{background:#8b5cf6}
+    .av-6{background:#ef4444}.av-7{background:#06b6d4}.av-8{background:#22c55e}.av-9{background:#f97316}.av-10{background:#64748b}
+    .av-11{background:#a855f7}.av-12{background:#0ea5e9}
+  </style>
+</head>
+<body>
+
+<aside class="sidebar">
+  <div class="sidebar-logo">Band<span>Viz</span></div>
+  <nav class="sidebar-nav">
+    <div class="nav-section-label">Overview</div>
+    <a href="00-home.html"            class="nav-item"><span class="icon">🏠</span> Home</a>
+    <a href="01-team-dashboard.html"  class="nav-item"><span class="icon">📊</span> Team Dashboard</a>
+    <a href="02-developer-detail.html"class="nav-item"><span class="icon">👤</span> Developer Detail</a>
+    <div class="nav-section-label" style="margin-top:8px">Planning</div>
+    <a href="03-leave-calendar.html"  class="nav-item"><span class="icon">📅</span> Leave Calendar</a>
+    <a href="04-bandwidth-planner.html"class="nav-item"><span class="icon">⚡</span> Bandwidth Planner</a>
+    <div class="nav-section-label" style="margin-top:8px">Integrations</div>
+    <a href="05-jira-sync.html"       class="nav-item"><span class="icon">🔗</span> Jira Sync</a>
+    <a href="06-settings.html"        class="nav-item active"><span class="icon">⚙️</span> Settings</a>
+  </nav>
+  <div class="sidebar-footer">
+    <div class="avatar-small">RM</div>
+    <div>
+      <div class="footer-user-name">Ravi M.</div>
+      <div class="footer-user-role">Engineering Manager</div>
+    </div>
+  </div>
+</aside>
+
+<main class="main">
+  <div class="topbar">
+    <div class="topbar-left">
+      <h1>Settings</h1>
+      <p>Manage team, projects, capacity defaults and notifications</p>
+    </div>
+    <div class="topbar-right">
+      <button class="btn btn-outline">↺ Reset Defaults</button>
+      <button class="btn btn-primary">💾 Save All</button>
+    </div>
+  </div>
+
+  <div class="content">
+
+    <!-- SETTINGS SIDEBAR NAV -->
+    <nav class="settings-nav">
+      <a href="#developers" class="sn-item active"><span class="sn-icon">👥</span> Developers</a>
+      <a href="#projects"   class="sn-item"><span class="sn-icon">📁</span> Projects</a>
+      <div class="sn-divider"></div>
+      <a href="#capacity"   class="sn-item"><span class="sn-icon">⚡</span> Capacity Rules</a>
+      <a href="#leave"      class="sn-item"><span class="sn-icon">🏖️</span> Leave Types</a>
+      <a href="#holidays"   class="sn-item"><span class="sn-icon">🏛️</span> Public Holidays</a>
+      <div class="sn-divider"></div>
+      <a href="#jira"       class="sn-item"><span class="sn-icon">🔗</span> Jira Integration</a>
+      <a href="#notify"     class="sn-item"><span class="sn-icon">🔔</span> Notifications</a>
+      <div class="sn-divider"></div>
+      <a href="#roles"      class="sn-item"><span class="sn-icon">🔐</span> Roles & Access</a>
+    </nav>
+
+    <!-- SETTINGS MAIN -->
+    <div class="settings-main">
+
+      <!-- DEVELOPERS -->
+      <div class="section-card" id="developers">
+        <div class="sc-header">
+          <div>
+            <div class="sc-title">Developers</div>
+            <div class="sc-sub">17 members · Click any field to edit</div>
+          </div>
+          <button class="btn btn-primary" style="font-size:12px;padding:7px 12px">+ Add Developer</button>
+        </div>
+        <div class="sc-body">
+          <table class="dev-table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Role</th>
+                <th>Weekly Capacity</th>
+                <th>Jira Username</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><div class="dev-name-cell"><div class="dev-avatar-sm av-1">AK</div><div><div style="font-weight:600">Arjun Kumar</div><div style="font-size:11px;color:#9ca3af">arjun.k@vymo.com</div></div></div></td>
+                <td><select class="role-select"><option selected>Sr. Backend Engineer</option><option>Backend Engineer</option><option>Frontend Engineer</option><option>Full Stack Engineer</option><option>QA Engineer</option><option>DevOps Engineer</option></select></td>
+                <td><input class="capacity-input" value="40" /> h/week</td>
+                <td><input class="capacity-input" style="width:120px" value="@arjun.kumar" /></td>
+                <td><span class="active-dot"></span> Active</td>
+                <td><div class="action-btns"><div class="btn-icon">✏️</div><div class="btn-icon del">🗑</div></div></td>
+              </tr>
+              <tr>
+                <td><div class="dev-name-cell"><div class="dev-avatar-sm av-2">PR</div><div><div style="font-weight:600">Priya Rao</div><div style="font-size:11px;color:#9ca3af">priya.r@vymo.com</div></div></div></td>
+                <td><select class="role-select"><option>Sr. Backend Engineer</option><option>Backend Engineer</option><option selected>Frontend Engineer</option><option>Full Stack Engineer</option><option>QA Engineer</option></select></td>
+                <td><input class="capacity-input" value="40" /> h/week</td>
+                <td><input class="capacity-input" style="width:120px" value="@priya.rao" /></td>
+                <td><span class="active-dot"></span> Active</td>
+                <td><div class="action-btns"><div class="btn-icon">✏️</div><div class="btn-icon del">🗑</div></div></td>
+              </tr>
+              <tr>
+                <td><div class="dev-name-cell"><div class="dev-avatar-sm av-3">SM</div><div><div style="font-weight:600">Siddharth M.</div><div style="font-size:11px;color:#9ca3af">siddharth.m@vymo.com</div></div></div></td>
+                <td><select class="role-select"><option>Sr. Backend Engineer</option><option selected>Backend Engineer</option><option>Frontend Engineer</option><option>Full Stack Engineer</option></select></td>
+                <td><input class="capacity-input" value="40" /> h/week</td>
+                <td><input class="capacity-input" style="width:120px" value="@sid.m" /></td>
+                <td><span class="active-dot"></span> Active</td>
+                <td><div class="action-btns"><div class="btn-icon">✏️</div><div class="btn-icon del">🗑</div></div></td>
+              </tr>
+              <tr>
+                <td><div class="dev-name-cell"><div class="dev-avatar-sm av-4">NJ</div><div><div style="font-weight:600">Neha Joshi</div><div style="font-size:11px;color:#9ca3af">neha.j@vymo.com</div></div></div></td>
+                <td><select class="role-select"><option>Sr. Backend Engineer</option><option>Backend Engineer</option><option>Frontend Engineer</option><option selected>Full Stack Engineer</option></select></td>
+                <td><input class="capacity-input" value="40" /> h/week</td>
+                <td><input class="capacity-input" style="width:120px" value="@neha.joshi" /></td>
+                <td><span class="active-dot"></span> Active</td>
+                <td><div class="action-btns"><div class="btn-icon">✏️</div><div class="btn-icon del">🗑</div></div></td>
+              </tr>
+              <tr>
+                <td><div class="dev-name-cell"><div class="dev-avatar-sm av-5">VK</div><div><div style="font-weight:600">Vikram K.</div><div style="font-size:11px;color:#9ca3af">vikram.k@vymo.com</div></div></div></td>
+                <td><select class="role-select"><option>Sr. Backend Engineer</option><option>Backend Engineer</option><option>Frontend Engineer</option><option>Full Stack Engineer</option><option>QA Engineer</option><option selected>DevOps Engineer</option></select></td>
+                <td><input class="capacity-input" value="40" /> h/week</td>
+                <td><input class="capacity-input" style="width:120px" value="@vikram.k" /></td>
+                <td><span class="active-dot"></span> Active</td>
+                <td><div class="action-btns"><div class="btn-icon">✏️</div><div class="btn-icon del">🗑</div></div></td>
+              </tr>
+              <tr style="background:#fafafa">
+                <td colspan="6" style="text-align:center;color:#9ca3af;font-size:12px;padding:10px">
+                  + 12 more developers · <a href="#" style="color:#4f8ef7;font-weight:500">Show all</a>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- PROJECTS -->
+      <div class="section-card" id="projects">
+        <div class="sc-header">
+          <div>
+            <div class="sc-title">Projects</div>
+            <div class="sc-sub">5 active projects</div>
+          </div>
+          <button class="btn btn-primary" style="font-size:12px;padding:7px 12px">+ Add Project</button>
+        </div>
+        <div class="sc-body">
+          <table class="proj-table">
+            <thead>
+              <tr>
+                <th>Project</th>
+                <th>Jira Key</th>
+                <th>Target Utilization</th>
+                <th>Members</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><span class="proj-color" style="background:#6366f1"></span><strong>CRM Core</strong></td>
+                <td style="font-family:monospace;font-size:12px;color:#0052cc;font-weight:700">VYMO</td>
+                <td><input class="capacity-input" value="70" />%</td>
+                <td>6</td>
+                <td><span class="active-dot"></span> Active</td>
+                <td><div class="action-btns"><div class="btn-icon">✏️</div><div class="btn-icon del">🗑</div></div></td>
+              </tr>
+              <tr>
+                <td><span class="proj-color" style="background:#a855f7"></span><strong>Analytics 2.0</strong></td>
+                <td style="font-family:monospace;font-size:12px;color:#0052cc;font-weight:700">ANA</td>
+                <td><input class="capacity-input" value="65" />%</td>
+                <td>3</td>
+                <td><span class="active-dot"></span> Active</td>
+                <td><div class="action-btns"><div class="btn-icon">✏️</div><div class="btn-icon del">🗑</div></div></td>
+              </tr>
+              <tr>
+                <td><span class="proj-color" style="background:#f97316"></span><strong>Mobile SDK</strong></td>
+                <td style="font-family:monospace;font-size:12px;color:#0052cc;font-weight:700">MOB</td>
+                <td><input class="capacity-input" value="60" />%</td>
+                <td>4</td>
+                <td><span class="active-dot"></span> Active</td>
+                <td><div class="action-btns"><div class="btn-icon">✏️</div><div class="btn-icon del">🗑</div></div></td>
+              </tr>
+              <tr>
+                <td><span class="proj-color" style="background:#22c55e"></span><strong>Integrations</strong></td>
+                <td style="font-family:monospace;font-size:12px;color:#0052cc;font-weight:700">INT</td>
+                <td><input class="capacity-input" value="50" />%</td>
+                <td>2</td>
+                <td><span class="active-dot"></span> Active</td>
+                <td><div class="action-btns"><div class="btn-icon">✏️</div><div class="btn-icon del">🗑</div></div></td>
+              </tr>
+              <tr>
+                <td><span class="proj-color" style="background:#ef4444"></span><strong>Infra</strong></td>
+                <td style="font-family:monospace;font-size:12px;color:#0052cc;font-weight:700">INF</td>
+                <td><input class="capacity-input" value="40" />%</td>
+                <td>2</td>
+                <td><span class="active-dot"></span> Active</td>
+                <td><div class="action-btns"><div class="btn-icon">✏️</div><div class="btn-icon del">🗑</div></div></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- CAPACITY RULES -->
+      <div class="section-card" id="capacity">
+        <div class="sc-header">
+          <div class="sc-title">Capacity Rules</div>
+        </div>
+        <div class="sc-body">
+          <div class="form-row">
+            <div><div class="form-label">Default Weekly Capacity</div><div class="form-sub">Hours per developer per week</div></div>
+            <input class="form-input" style="width:100px;text-align:center" value="40 hours" />
+          </div>
+          <div class="form-row">
+            <div><div class="form-label">Overload Threshold</div><div class="form-sub">Flag developer as overloaded above this %</div></div>
+            <input class="form-input" style="width:100px;text-align:center" value="85%" />
+          </div>
+          <div class="form-row">
+            <div><div class="form-label">Busy Threshold</div><div class="form-sub">Flag developer as busy above this %</div></div>
+            <input class="form-input" style="width:100px;text-align:center" value="70%" />
+          </div>
+          <div class="form-row">
+            <div><div class="form-label">Leave Impact on Bandwidth</div><div class="form-sub">Auto-reduce bandwidth during approved leaves</div></div>
+            <div class="toggle"></div>
+          </div>
+          <div class="form-row">
+            <div><div class="form-label">Story Points Weight</div><div class="form-sub">Story points used to calculate bandwidth load</div></div>
+            <div class="toggle"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- LEAVE TYPES -->
+      <div class="section-card" id="leave">
+        <div class="sc-header">
+          <div class="sc-title">Leave Types</div>
+        </div>
+        <div class="sc-body">
+          <div class="leave-type-row">
+            <div class="lt-color" style="background:#bfdbfe"></div>
+            <span class="lt-name">Planned Leave</span>
+            <span class="lt-days">Max 18 days/year</span>
+            <span class="lt-badge ltb-paid">Paid</span>
+          </div>
+          <div class="leave-type-row">
+            <div class="lt-color" style="background:#fed7aa"></div>
+            <span class="lt-name">Sick Leave</span>
+            <span class="lt-days">Max 12 days/year</span>
+            <span class="lt-badge ltb-paid">Paid</span>
+          </div>
+          <div class="leave-type-row">
+            <div class="lt-color" style="background:#e9d5ff"></div>
+            <span class="lt-name">Comp-off</span>
+            <span class="lt-days">Carry forward 30 days</span>
+            <span class="lt-badge ltb-paid">Paid</span>
+          </div>
+          <div class="leave-type-row">
+            <div class="lt-color" style="background:#fef9c3"></div>
+            <span class="lt-name">Unpaid Leave</span>
+            <span class="lt-days">No limit</span>
+            <span class="lt-badge ltb-unpaid">Unpaid</span>
+          </div>
+          <div class="leave-type-row" style="border-bottom:none">
+            <div class="lt-color" style="background:#d1fae5"></div>
+            <span class="lt-name">Public Holiday</span>
+            <span class="lt-days">Set per calendar year</span>
+            <span class="lt-badge ltb-paid">Paid</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- NOTIFICATIONS -->
+      <div class="section-card" id="notify">
+        <div class="sc-header">
+          <div class="sc-title">Notifications</div>
+        </div>
+        <div class="sc-body">
+          <div class="form-row">
+            <div><div class="form-label">Email Alerts</div><div class="form-sub">Send email when developer exceeds threshold</div></div>
+            <div class="toggle"></div>
+          </div>
+          <div class="form-row">
+            <div><div class="form-label">Slack Notifications</div><div class="form-sub">Post overload alerts to Slack channel</div></div>
+            <div class="toggle off"></div>
+          </div>
+          <div class="form-row">
+            <div><div class="form-label">Slack Webhook URL</div><div class="form-sub">For Slack integration</div></div>
+            <input class="form-input" placeholder="https://hooks.slack.com/..." />
+          </div>
+          <div class="form-row">
+            <div><div class="form-label">Sprint End Report</div><div class="form-sub">Auto-email bandwidth summary at sprint end</div></div>
+            <div class="toggle"></div>
+          </div>
+          <div class="form-row" style="border-bottom:none">
+            <div><div class="form-label">Notify on Leave Approval</div><div class="form-sub">Alert manager when team applies for leave</div></div>
+            <div class="toggle"></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</main>
+</body>
+</html>

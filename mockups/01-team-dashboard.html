@@ -1,0 +1,965 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Team Bandwidth Dashboard</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f0f2f5;
+      color: #1a1a2e;
+      display: flex;
+      min-height: 100vh;
+    }
+
+    /* ── SIDEBAR ── */
+    .sidebar {
+      width: 220px;
+      background: #1a1a2e;
+      display: flex;
+      flex-direction: column;
+      padding: 0;
+      flex-shrink: 0;
+      position: fixed;
+      top: 0; left: 0; bottom: 0;
+    }
+    .sidebar-logo {
+      padding: 20px 24px;
+      font-size: 18px;
+      font-weight: 700;
+      color: #fff;
+      border-bottom: 1px solid #2d2d4e;
+      letter-spacing: 0.5px;
+    }
+    .sidebar-logo span { color: #4f8ef7; }
+    .sidebar-nav { padding: 16px 0; flex: 1; }
+    .nav-section-label {
+      font-size: 10px;
+      font-weight: 600;
+      color: #6b7280;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      padding: 8px 24px 4px;
+    }
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 24px;
+      color: #9ca3af;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.15s;
+      border-left: 3px solid transparent;
+      text-decoration: none;
+    }
+    .nav-item:hover { background: #2d2d4e; color: #e5e7eb; }
+    .nav-item.active {
+      background: #1e3a5f;
+      color: #4f8ef7;
+      border-left-color: #4f8ef7;
+      font-weight: 600;
+    }
+    .nav-item .icon { font-size: 16px; width: 20px; text-align: center; }
+    .sidebar-footer {
+      padding: 16px 24px;
+      border-top: 1px solid #2d2d4e;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .avatar-small {
+      width: 32px; height: 32px;
+      border-radius: 50%;
+      background: #4f8ef7;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px; font-weight: 700; color: #fff;
+      flex-shrink: 0;
+    }
+    .footer-user-name { font-size: 13px; color: #d1d5db; font-weight: 500; }
+    .footer-user-role { font-size: 11px; color: #6b7280; }
+
+    /* ── MAIN ── */
+    .main {
+      margin-left: 220px;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── TOPBAR ── */
+    .topbar {
+      background: #fff;
+      padding: 14px 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid #e5e7eb;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    .topbar-left h1 { font-size: 18px; font-weight: 700; color: #111827; }
+    .topbar-left p { font-size: 13px; color: #6b7280; margin-top: 1px; }
+    .topbar-right { display: flex; align-items: center; gap: 12px; }
+    .btn {
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      border: none;
+      transition: all 0.15s;
+    }
+    .btn-primary { background: #4f8ef7; color: #fff; }
+    .btn-primary:hover { background: #3a7bd5; }
+    .btn-outline {
+      background: #fff;
+      color: #374151;
+      border: 1px solid #d1d5db;
+    }
+    .btn-outline:hover { background: #f9fafb; }
+    .sprint-badge {
+      background: #eff6ff;
+      color: #1d4ed8;
+      border: 1px solid #bfdbfe;
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    /* ── CONTENT ── */
+    .content { padding: 24px 28px; }
+
+    /* ── FILTERS ── */
+    .filters {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+    }
+    .filter-label { font-size: 13px; color: #6b7280; font-weight: 500; }
+    .filter-select {
+      padding: 7px 12px;
+      border-radius: 8px;
+      border: 1px solid #d1d5db;
+      background: #fff;
+      font-size: 13px;
+      color: #374151;
+      cursor: pointer;
+    }
+    .filter-chip {
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      border: 1px solid #d1d5db;
+      background: #fff;
+      color: #374151;
+      transition: all 0.15s;
+    }
+    .filter-chip.active {
+      background: #1a1a2e;
+      color: #fff;
+      border-color: #1a1a2e;
+    }
+    .filter-divider { width: 1px; height: 20px; background: #e5e7eb; }
+
+    /* ── STAT CARDS ── */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .stat-card {
+      background: #fff;
+      border-radius: 12px;
+      padding: 20px;
+      border: 1px solid #e5e7eb;
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+    }
+    .stat-icon {
+      width: 44px; height: 44px;
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px;
+      flex-shrink: 0;
+    }
+    .stat-icon.blue   { background: #eff6ff; }
+    .stat-icon.green  { background: #f0fdf4; }
+    .stat-icon.orange { background: #fff7ed; }
+    .stat-icon.red    { background: #fef2f2; }
+    .stat-value { font-size: 26px; font-weight: 700; color: #111827; line-height: 1; }
+    .stat-label { font-size: 12px; color: #6b7280; margin-top: 4px; }
+    .stat-sub   { font-size: 11px; margin-top: 6px; }
+    .stat-sub.up   { color: #16a34a; }
+    .stat-sub.down { color: #dc2626; }
+
+    /* ── SECTION HEADER ── */
+    .section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+    .section-title { font-size: 15px; font-weight: 700; color: #111827; }
+    .section-sub   { font-size: 12px; color: #6b7280; margin-top: 2px; }
+    .view-toggle { display: flex; gap: 4px; }
+    .toggle-btn {
+      padding: 5px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      border: 1px solid #d1d5db;
+      background: #fff;
+      cursor: pointer;
+      color: #6b7280;
+    }
+    .toggle-btn.active { background: #1a1a2e; color: #fff; border-color: #1a1a2e; }
+
+    /* ── DEVELOPER GRID ── */
+    .dev-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+
+    /* ── DEVELOPER CARD ── */
+    .dev-card {
+      background: #fff;
+      border-radius: 12px;
+      border: 1px solid #e5e7eb;
+      overflow: hidden;
+      transition: box-shadow 0.2s;
+    }
+    .dev-card:hover { box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
+    .dev-card-header {
+      padding: 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      border-bottom: 1px solid #f3f4f6;
+    }
+    .avatar {
+      width: 42px; height: 42px;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 15px; font-weight: 700; color: #fff;
+      flex-shrink: 0;
+    }
+    .dev-name { font-size: 14px; font-weight: 600; color: #111827; }
+    .dev-role { font-size: 11px; color: #6b7280; margin-top: 2px; }
+    .dev-status {
+      margin-left: auto;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .status-available  { background: #dcfce7; color: #166534; }
+    .status-busy       { background: #fef3c7; color: #92400e; }
+    .status-overloaded { background: #fee2e2; color: #991b1b; }
+    .status-leave      { background: #f3f4f6; color: #6b7280; }
+
+    .dev-card-body { padding: 14px 16px; display: flex; flex-direction: column; gap: 12px; }
+
+    /* bandwidth bar */
+    .bw-row { display: flex; flex-direction: column; gap: 5px; }
+    .bw-label {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .bw-label-text { font-size: 11px; color: #6b7280; font-weight: 500; }
+    .bw-pct {
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .bw-pct.low    { color: #16a34a; }
+    .bw-pct.medium { color: #d97706; }
+    .bw-pct.high   { color: #dc2626; }
+    .bw-track {
+      height: 7px;
+      background: #f3f4f6;
+      border-radius: 99px;
+      overflow: hidden;
+    }
+    .bw-fill {
+      height: 100%;
+      border-radius: 99px;
+      transition: width 0.3s;
+    }
+    .bw-fill.low    { background: #22c55e; }
+    .bw-fill.medium { background: #f59e0b; }
+    .bw-fill.high   { background: #ef4444; }
+
+    /* metrics row */
+    .metrics-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+    .metric-box {
+      background: #f9fafb;
+      border-radius: 8px;
+      padding: 8px 10px;
+      text-align: center;
+    }
+    .metric-val { font-size: 16px; font-weight: 700; color: #111827; }
+    .metric-lbl { font-size: 10px; color: #9ca3af; margin-top: 2px; }
+
+    /* ticket pills */
+    .tickets-row {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .ticket-pill {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 500;
+      border: 1px solid;
+    }
+    .pill-inprogress { background: #eff6ff; color: #1d4ed8; border-color: #bfdbfe; }
+    .pill-review     { background: #fdf4ff; color: #7e22ce; border-color: #e9d5ff; }
+    .pill-blocked    { background: #fff1f2; color: #be123c; border-color: #fecdd3; }
+    .pill-dot { width: 6px; height: 6px; border-radius: 50%; }
+    .pill-inprogress .pill-dot { background: #3b82f6; }
+    .pill-review     .pill-dot { background: #a855f7; }
+    .pill-blocked    .pill-dot { background: #f43f5e; }
+
+    /* leave indicator */
+    .leave-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 10px;
+      background: #f9fafb;
+      border-radius: 8px;
+      font-size: 11px;
+      color: #6b7280;
+    }
+    .leave-bar .icon { font-size: 14px; }
+    .leave-days { font-weight: 600; color: #374151; }
+
+    .dev-card-footer {
+      padding: 10px 16px;
+      background: #fafafa;
+      border-top: 1px solid #f3f4f6;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .project-tags { display: flex; gap: 5px; flex-wrap: wrap; }
+    .project-tag {
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: 600;
+      background: #e0e7ff;
+      color: #3730a3;
+    }
+    .card-action {
+      font-size: 11px;
+      color: #4f8ef7;
+      cursor: pointer;
+      font-weight: 500;
+    }
+    .card-action:hover { text-decoration: underline; }
+
+    /* ── ALERT BANNER ── */
+    .alert-banner {
+      background: #fff7ed;
+      border: 1px solid #fed7aa;
+      border-radius: 10px;
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 20px;
+      font-size: 13px;
+      color: #92400e;
+    }
+    .alert-icon { font-size: 18px; }
+
+    /* ── COLORS for avatars ── */
+    .av-1  { background: #6366f1; }
+    .av-2  { background: #ec4899; }
+    .av-3  { background: #14b8a6; }
+    .av-4  { background: #f59e0b; }
+    .av-5  { background: #8b5cf6; }
+    .av-6  { background: #ef4444; }
+    .av-7  { background: #06b6d4; }
+    .av-8  { background: #22c55e; }
+    .av-9  { background: #f97316; }
+    .av-10 { background: #64748b; }
+    .av-11 { background: #a855f7; }
+    .av-12 { background: #0ea5e9; }
+  </style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<aside class="sidebar">
+  <div class="sidebar-logo">Band<span>Viz</span></div>
+  <nav class="sidebar-nav">
+    <div class="nav-section-label">Overview</div>
+    <a href="00-home.html"             class="nav-item"><span class="icon">🏠</span> Home</a>
+    <a href="01-team-dashboard.html"   class="nav-item active"><span class="icon">📊</span> Team Dashboard</a>
+    <a href="02-developer-detail.html" class="nav-item"><span class="icon">👤</span> Developer Detail</a>
+
+    <div class="nav-section-label" style="margin-top:8px;">Planning</div>
+    <a href="03-leave-calendar.html"   class="nav-item"><span class="icon">📅</span> Leave Calendar</a>
+    <a href="04-bandwidth-planner.html"class="nav-item"><span class="icon">⚡</span> Bandwidth Planner</a>
+
+    <div class="nav-section-label" style="margin-top:8px;">Integrations</div>
+    <a href="05-jira-sync.html"        class="nav-item"><span class="icon">🔗</span> Jira Sync</a>
+    <a href="06-settings.html"         class="nav-item"><span class="icon">⚙️</span> Settings</a>
+  </nav>
+  <div class="sidebar-footer">
+    <div class="avatar-small">RM</div>
+    <div>
+      <div class="footer-user-name">Ravi M.</div>
+      <div class="footer-user-role">Engineering Manager</div>
+    </div>
+  </div>
+</aside>
+
+<!-- MAIN -->
+<main class="main">
+
+  <!-- TOPBAR -->
+  <div class="topbar">
+    <div class="topbar-left">
+      <h1>Team Dashboard</h1>
+      <p>Post-Sales Engineering · 17 developers</p>
+    </div>
+    <div class="topbar-right">
+      <span class="sprint-badge">🏃 Sprint 42 · Mar 17 – Mar 28</span>
+      <button class="btn btn-outline">⬇ Export</button>
+      <button class="btn btn-primary">+ Add Developer</button>
+    </div>
+  </div>
+
+  <div class="content">
+
+    <!-- ALERT -->
+    <div class="alert-banner">
+      <span class="alert-icon">⚠️</span>
+      <span><strong>3 developers</strong> are overloaded this sprint. <strong>2 developers</strong> are on leave this week. Review allocations before assigning new work.</span>
+    </div>
+
+    <!-- FILTERS -->
+    <div class="filters">
+      <span class="filter-label">View by:</span>
+      <span class="filter-chip active">All</span>
+      <span class="filter-chip">Available</span>
+      <span class="filter-chip">Overloaded</span>
+      <span class="filter-chip">On Leave</span>
+      <div class="filter-divider"></div>
+      <span class="filter-label">Project:</span>
+      <select class="filter-select">
+        <option>All Projects</option>
+        <option>Vymo CRM</option>
+        <option>Analytics 2.0</option>
+        <option>Mobile SDK</option>
+        <option>Integrations</option>
+      </select>
+      <select class="filter-select">
+        <option>This Sprint</option>
+        <option>This Week</option>
+        <option>This Month</option>
+        <option>Next Sprint</option>
+      </select>
+    </div>
+
+    <!-- STAT CARDS -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-icon blue">👥</div>
+        <div>
+          <div class="stat-value">17</div>
+          <div class="stat-label">Total Developers</div>
+          <div class="stat-sub up">↑ 2 from last sprint</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon green">✅</div>
+        <div>
+          <div class="stat-value">11</div>
+          <div class="stat-label">Available This Week</div>
+          <div class="stat-sub up">64.7% of team</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon orange">🎫</div>
+        <div>
+          <div class="stat-value">84</div>
+          <div class="stat-label">Open Jira Tickets</div>
+          <div class="stat-sub down">↑ 12 from last week</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon red">🏖️</div>
+        <div>
+          <div class="stat-value">4</div>
+          <div class="stat-label">On Leave This Week</div>
+          <div class="stat-sub down">23.5% of team</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DEVELOPER GRID -->
+    <div class="section-header">
+      <div>
+        <div class="section-title">Developer Bandwidth</div>
+        <div class="section-sub">Showing 17 of 17 · Last synced with Jira 12 min ago</div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <div class="view-toggle">
+          <button class="toggle-btn active">⊞ Grid</button>
+          <button class="toggle-btn">≡ List</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="dev-grid">
+
+      <!-- CARD 1 — Overloaded -->
+      <div class="dev-card">
+        <div class="dev-card-header">
+          <div class="avatar av-1">AK</div>
+          <div>
+            <div class="dev-name">Arjun Kumar</div>
+            <div class="dev-role">Senior Backend Engineer</div>
+          </div>
+          <span class="dev-status status-overloaded">Overloaded</span>
+        </div>
+        <div class="dev-card-body">
+          <div class="bw-row">
+            <div class="bw-label">
+              <span class="bw-label-text">Bandwidth Used</span>
+              <span class="bw-pct high">95%</span>
+            </div>
+            <div class="bw-track"><div class="bw-fill high" style="width:95%"></div></div>
+          </div>
+          <div class="metrics-row">
+            <div class="metric-box">
+              <div class="metric-val">8</div>
+              <div class="metric-lbl">Tickets</div>
+            </div>
+            <div class="metric-box">
+              <div class="metric-val">34</div>
+              <div class="metric-lbl">Story Pts</div>
+            </div>
+            <div class="metric-box">
+              <div class="metric-val">0</div>
+              <div class="metric-lbl">Leave Days</div>
+            </div>
+          </div>
+          <div class="tickets-row">
+            <span class="ticket-pill pill-inprogress"><span class="pill-dot"></span>5 In Progress</span>
+            <span class="ticket-pill pill-review"><span class="pill-dot"></span>2 In Review</span>
+            <span class="ticket-pill pill-blocked"><span class="pill-dot"></span>1 Blocked</span>
+          </div>
+        </div>
+        <div class="dev-card-footer">
+          <div class="project-tags">
+            <span class="project-tag">CRM Core</span>
+            <span class="project-tag">Analytics</span>
+          </div>
+          <span class="card-action">View Details →</span>
+        </div>
+      </div>
+
+      <!-- CARD 2 — Available -->
+      <div class="dev-card">
+        <div class="dev-card-header">
+          <div class="avatar av-2">PR</div>
+          <div>
+            <div class="dev-name">Priya Rao</div>
+            <div class="dev-role">Frontend Engineer</div>
+          </div>
+          <span class="dev-status status-available">Available</span>
+        </div>
+        <div class="dev-card-body">
+          <div class="bw-row">
+            <div class="bw-label">
+              <span class="bw-label-text">Bandwidth Used</span>
+              <span class="bw-pct low">45%</span>
+            </div>
+            <div class="bw-track"><div class="bw-fill low" style="width:45%"></div></div>
+          </div>
+          <div class="metrics-row">
+            <div class="metric-box">
+              <div class="metric-val">3</div>
+              <div class="metric-lbl">Tickets</div>
+            </div>
+            <div class="metric-box">
+              <div class="metric-val">13</div>
+              <div class="metric-lbl">Story Pts</div>
+            </div>
+            <div class="metric-box">
+              <div class="metric-val">0</div>
+              <div class="metric-lbl">Leave Days</div>
+            </div>
+          </div>
+          <div class="tickets-row">
+            <span class="ticket-pill pill-inprogress"><span class="pill-dot"></span>2 In Progress</span>
+            <span class="ticket-pill pill-review"><span class="pill-dot"></span>1 In Review</span>
+          </div>
+        </div>
+        <div class="dev-card-footer">
+          <div class="project-tags">
+            <span class="project-tag">Mobile SDK</span>
+          </div>
+          <span class="card-action">View Details →</span>
+        </div>
+      </div>
+
+      <!-- CARD 3 — On Leave -->
+      <div class="dev-card" style="opacity:0.75;">
+        <div class="dev-card-header">
+          <div class="avatar av-3">SM</div>
+          <div>
+            <div class="dev-name">Siddharth M.</div>
+            <div class="dev-role">Backend Engineer</div>
+          </div>
+          <span class="dev-status status-leave">On Leave</span>
+        </div>
+        <div class="dev-card-body">
+          <div class="bw-row">
+            <div class="bw-label">
+              <span class="bw-label-text">Bandwidth Used</span>
+              <span class="bw-pct low">0%</span>
+            </div>
+            <div class="bw-track"><div class="bw-fill low" style="width:0%"></div></div>
+          </div>
+          <div class="leave-bar">
+            <span class="icon">🏖️</span>
+            <span>On leave · <span class="leave-days">Mar 24 – Mar 26</span> (3 days)</span>
+          </div>
+          <div class="metrics-row">
+            <div class="metric-box">
+              <div class="metric-val">2</div>
+              <div class="metric-lbl">Tickets</div>
+            </div>
+            <div class="metric-box">
+              <div class="metric-val">8</div>
+              <div class="metric-lbl">Story Pts</div>
+            </div>
+            <div class="metric-box">
+              <div class="metric-val">3</div>
+              <div class="metric-lbl">Leave Days</div>
+            </div>
+          </div>
+        </div>
+        <div class="dev-card-footer">
+          <div class="project-tags">
+            <span class="project-tag">Integrations</span>
+          </div>
+          <span class="card-action">View Details →</span>
+        </div>
+      </div>
+
+      <!-- CARD 4 — Busy -->
+      <div class="dev-card">
+        <div class="dev-card-header">
+          <div class="avatar av-4">NJ</div>
+          <div>
+            <div class="dev-name">Neha Joshi</div>
+            <div class="dev-role">Full Stack Engineer</div>
+          </div>
+          <span class="dev-status status-busy">Busy</span>
+        </div>
+        <div class="dev-card-body">
+          <div class="bw-row">
+            <div class="bw-label">
+              <span class="bw-label-text">Bandwidth Used</span>
+              <span class="bw-pct medium">72%</span>
+            </div>
+            <div class="bw-track"><div class="bw-fill medium" style="width:72%"></div></div>
+          </div>
+          <div class="metrics-row">
+            <div class="metric-box">
+              <div class="metric-val">5</div>
+              <div class="metric-lbl">Tickets</div>
+            </div>
+            <div class="metric-box">
+              <div class="metric-val">21</div>
+              <div class="metric-lbl">Story Pts</div>
+            </div>
+            <div class="metric-box">
+              <div class="metric-val">0</div>
+              <div class="metric-lbl">Leave Days</div>
+            </div>
+          </div>
+          <div class="tickets-row">
+            <span class="ticket-pill pill-inprogress"><span class="pill-dot"></span>3 In Progress</span>
+            <span class="ticket-pill pill-review"><span class="pill-dot"></span>2 In Review</span>
+          </div>
+        </div>
+        <div class="dev-card-footer">
+          <div class="project-tags">
+            <span class="project-tag">CRM Core</span>
+            <span class="project-tag">Mobile SDK</span>
+          </div>
+          <span class="card-action">View Details →</span>
+        </div>
+      </div>
+
+      <!-- CARD 5 — Available -->
+      <div class="dev-card">
+        <div class="dev-card-header">
+          <div class="avatar av-5">VK</div>
+          <div>
+            <div class="dev-name">Vikram K.</div>
+            <div class="dev-role">DevOps Engineer</div>
+          </div>
+          <span class="dev-status status-available">Available</span>
+        </div>
+        <div class="dev-card-body">
+          <div class="bw-row">
+            <div class="bw-label">
+              <span class="bw-label-text">Bandwidth Used</span>
+              <span class="bw-pct low">30%</span>
+            </div>
+            <div class="bw-track"><div class="bw-fill low" style="width:30%"></div></div>
+          </div>
+          <div class="metrics-row">
+            <div class="metric-box">
+              <div class="metric-val">2</div>
+              <div class="metric-lbl">Tickets</div>
+            </div>
+            <div class="metric-box">
+              <div class="metric-val">9</div>
+              <div class="metric-lbl">Story Pts</div>
+            </div>
+            <div class="metric-box">
+              <div class="metric-val">1</div>
+              <div class="metric-lbl">Leave Days</div>
+            </div>
+          </div>
+          <div class="tickets-row">
+            <span class="ticket-pill pill-inprogress"><span class="pill-dot"></span>2 In Progress</span>
+          </div>
+          <div class="leave-bar">
+            <span class="icon">📅</span>
+            <span>Planned leave · <span class="leave-days">Mar 28</span> (1 day)</span>
+          </div>
+        </div>
+        <div class="dev-card-footer">
+          <div class="project-tags">
+            <span class="project-tag">Infra</span>
+          </div>
+          <span class="card-action">View Details →</span>
+        </div>
+      </div>
+
+      <!-- CARD 6 — Overloaded -->
+      <div class="dev-card">
+        <div class="dev-card-header">
+          <div class="avatar av-6">AS</div>
+          <div>
+            <div class="dev-name">Aditya Singh</div>
+            <div class="dev-role">Senior Frontend Eng.</div>
+          </div>
+          <span class="dev-status status-overloaded">Overloaded</span>
+        </div>
+        <div class="dev-card-body">
+          <div class="bw-row">
+            <div class="bw-label">
+              <span class="bw-label-text">Bandwidth Used</span>
+              <span class="bw-pct high">110%</span>
+            </div>
+            <div class="bw-track"><div class="bw-fill high" style="width:100%"></div></div>
+          </div>
+          <div class="metrics-row">
+            <div class="metric-box">
+              <div class="metric-val">9</div>
+              <div class="metric-lbl">Tickets</div>
+            </div>
+            <div class="metric-box">
+              <div class="metric-val">41</div>
+              <div class="metric-lbl">Story Pts</div>
+            </div>
+            <div class="metric-box">
+              <div class="metric-val">0</div>
+              <div class="metric-lbl">Leave Days</div>
+            </div>
+          </div>
+          <div class="tickets-row">
+            <span class="ticket-pill pill-inprogress"><span class="pill-dot"></span>6 In Progress</span>
+            <span class="ticket-pill pill-blocked"><span class="pill-dot"></span>2 Blocked</span>
+          </div>
+        </div>
+        <div class="dev-card-footer">
+          <div class="project-tags">
+            <span class="project-tag">Analytics</span>
+            <span class="project-tag">CRM Core</span>
+          </div>
+          <span class="card-action">View Details →</span>
+        </div>
+      </div>
+
+      <!-- CARD 7 -->
+      <div class="dev-card">
+        <div class="dev-card-header">
+          <div class="avatar av-7">DP</div>
+          <div>
+            <div class="dev-name">Divya Patel</div>
+            <div class="dev-role">QA Engineer</div>
+          </div>
+          <span class="dev-status status-available">Available</span>
+        </div>
+        <div class="dev-card-body">
+          <div class="bw-row">
+            <div class="bw-label">
+              <span class="bw-label-text">Bandwidth Used</span>
+              <span class="bw-pct low">55%</span>
+            </div>
+            <div class="bw-track"><div class="bw-fill low" style="width:55%"></div></div>
+          </div>
+          <div class="metrics-row">
+            <div class="metric-box">
+              <div class="metric-val">4</div>
+              <div class="metric-lbl">Tickets</div>
+            </div>
+            <div class="metric-box">
+              <div class="metric-val">16</div>
+              <div class="metric-lbl">Story Pts</div>
+            </div>
+            <div class="metric-box">
+              <div class="metric-val">0</div>
+              <div class="metric-lbl">Leave Days</div>
+            </div>
+          </div>
+          <div class="tickets-row">
+            <span class="ticket-pill pill-inprogress"><span class="pill-dot"></span>3 In Progress</span>
+            <span class="ticket-pill pill-review"><span class="pill-dot"></span>1 In Review</span>
+          </div>
+        </div>
+        <div class="dev-card-footer">
+          <div class="project-tags">
+            <span class="project-tag">Mobile SDK</span>
+          </div>
+          <span class="card-action">View Details →</span>
+        </div>
+      </div>
+
+      <!-- CARD 8 — On Leave -->
+      <div class="dev-card" style="opacity:0.75;">
+        <div class="dev-card-header">
+          <div class="avatar av-8">RN</div>
+          <div>
+            <div class="dev-name">Rahul Nair</div>
+            <div class="dev-role">Backend Engineer</div>
+          </div>
+          <span class="dev-status status-leave">On Leave</span>
+        </div>
+        <div class="dev-card-body">
+          <div class="bw-row">
+            <div class="bw-label">
+              <span class="bw-label-text">Bandwidth Used</span>
+              <span class="bw-pct low">0%</span>
+            </div>
+            <div class="bw-track"><div class="bw-fill low" style="width:0%"></div></div>
+          </div>
+          <div class="leave-bar">
+            <span class="icon">🏥</span>
+            <span>Sick leave · <span class="leave-days">Mar 24 – Mar 25</span> (2 days)</span>
+          </div>
+          <div class="metrics-row">
+            <div class="metric-box">
+              <div class="metric-val">3</div>
+              <div class="metric-lbl">Tickets</div>
+            </div>
+            <div class="metric-box">
+              <div class="metric-val">11</div>
+              <div class="metric-lbl">Story Pts</div>
+            </div>
+            <div class="metric-box">
+              <div class="metric-val">2</div>
+              <div class="metric-lbl">Leave Days</div>
+            </div>
+          </div>
+        </div>
+        <div class="dev-card-footer">
+          <div class="project-tags">
+            <span class="project-tag">Integrations</span>
+          </div>
+          <span class="card-action">View Details →</span>
+        </div>
+      </div>
+
+      <!-- CARD 9 — Busy -->
+      <div class="dev-card">
+        <div class="dev-card-header">
+          <div class="avatar av-9">KT</div>
+          <div>
+            <div class="dev-name">Kiran Thakur</div>
+            <div class="dev-role">Full Stack Engineer</div>
+          </div>
+          <span class="dev-status status-busy">Busy</span>
+        </div>
+        <div class="dev-card-body">
+          <div class="bw-row">
+            <div class="bw-label">
+              <span class="bw-label-text">Bandwidth Used</span>
+              <span class="bw-pct medium">80%</span>
+            </div>
+            <div class="bw-track"><div class="bw-fill medium" style="width:80%"></div></div>
+          </div>
+          <div class="metrics-row">
+            <div class="metric-box">
+              <div class="metric-val">6</div>
+              <div class="metric-lbl">Tickets</div>
+            </div>
+            <div class="metric-box">
+              <div class="metric-val">27</div>
+              <div class="metric-lbl">Story Pts</div>
+            </div>
+            <div class="metric-box">
+              <div class="metric-val">0</div>
+              <div class="metric-lbl">Leave Days</div>
+            </div>
+          </div>
+          <div class="tickets-row">
+            <span class="ticket-pill pill-inprogress"><span class="pill-dot"></span>4 In Progress</span>
+            <span class="ticket-pill pill-review"><span class="pill-dot"></span>2 In Review</span>
+          </div>
+        </div>
+        <div class="dev-card-footer">
+          <div class="project-tags">
+            <span class="project-tag">CRM Core</span>
+          </div>
+          <span class="card-action">View Details →</span>
+        </div>
+      </div>
+
+    </div><!-- /dev-grid -->
+
+    <!-- LOAD MORE -->
+    <div style="text-align:center; margin-top:24px;">
+      <button class="btn btn-outline" style="padding:10px 32px;">
+        Show 8 more developers ↓
+      </button>
+    </div>
+
+  </div><!-- /content -->
+</main>
+
+</body>
+</html>

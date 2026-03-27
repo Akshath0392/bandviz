@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>BandViz – Developer Detail</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f0f2f5;color:#1a1a2e;display:flex;min-height:100vh}
+    .sidebar{width:220px;background:#1a1a2e;display:flex;flex-direction:column;flex-shrink:0;position:fixed;top:0;left:0;bottom:0}
+    .sidebar-logo{padding:20px 24px;font-size:18px;font-weight:700;color:#fff;border-bottom:1px solid #2d2d4e;letter-spacing:.5px}
+    .sidebar-logo span{color:#4f8ef7}
+    .sidebar-nav{padding:16px 0;flex:1}
+    .nav-section-label{font-size:10px;font-weight:600;color:#6b7280;letter-spacing:1px;text-transform:uppercase;padding:8px 24px 4px}
+    .nav-item{display:flex;align-items:center;gap:10px;padding:10px 24px;color:#9ca3af;font-size:14px;cursor:pointer;border-left:3px solid transparent;text-decoration:none}
+    .nav-item:hover{background:#2d2d4e;color:#e5e7eb}
+    .nav-item.active{background:#1e3a5f;color:#4f8ef7;border-left-color:#4f8ef7;font-weight:600}
+    .nav-item .icon{font-size:16px;width:20px;text-align:center}
+    .sidebar-footer{padding:16px 24px;border-top:1px solid #2d2d4e;display:flex;align-items:center;gap:10px}
+    .avatar-small{width:32px;height:32px;border-radius:50%;background:#4f8ef7;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#fff;flex-shrink:0}
+    .footer-user-name{font-size:13px;color:#d1d5db;font-weight:500}
+    .footer-user-role{font-size:11px;color:#6b7280}
+    .main{margin-left:220px;flex:1;display:flex;flex-direction:column}
+    .topbar{background:#fff;padding:14px 28px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #e5e7eb;position:sticky;top:0;z-index:10}
+    .topbar-left{display:flex;align-items:center;gap:10px}
+    .back-btn{font-size:13px;color:#4f8ef7;cursor:pointer;text-decoration:none;display:flex;align-items:center;gap:4px;padding:6px 10px;border-radius:8px;border:1px solid #bfdbfe;background:#eff6ff}
+    .back-btn:hover{background:#dbeafe}
+    .topbar-left h1{font-size:18px;font-weight:700;color:#111827}
+    .topbar-left p{font-size:13px;color:#6b7280;margin-top:1px}
+    .topbar-right{display:flex;align-items:center;gap:12px}
+    .btn{padding:8px 16px;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;border:none;transition:all .15s;text-decoration:none;display:inline-flex;align-items:center;gap:6px}
+    .btn-primary{background:#4f8ef7;color:#fff}
+    .btn-primary:hover{background:#3a7bd5}
+    .btn-outline{background:#fff;color:#374151;border:1px solid #d1d5db}
+    .btn-outline:hover{background:#f9fafb}
+    .btn-danger{background:#fef2f2;color:#dc2626;border:1px solid #fecaca}
+    .content{padding:24px 28px}
+    /* PROFILE HEADER */
+    .profile-header{background:#fff;border-radius:16px;border:1px solid #e5e7eb;padding:28px;display:flex;align-items:center;gap:24px;margin-bottom:24px}
+    .profile-avatar{width:80px;height:80px;border-radius:50%;background:#6366f1;display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:800;color:#fff;flex-shrink:0}
+    .profile-info{flex:1}
+    .profile-name{font-size:22px;font-weight:800;color:#111827;margin-bottom:4px}
+    .profile-role{font-size:14px;color:#6b7280;margin-bottom:12px}
+    .profile-tags{display:flex;gap:8px;flex-wrap:wrap}
+    .profile-tag{padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600}
+    .tag-blue{background:#eff6ff;color:#1d4ed8}
+    .tag-purple{background:#faf5ff;color:#7c3aed}
+    .tag-green{background:#f0fdf4;color:#166534}
+    .tag-orange{background:#fff7ed;color:#c2410c}
+    .profile-stats{display:flex;gap:32px;margin-left:auto}
+    .p-stat{text-align:center}
+    .p-stat-val{font-size:24px;font-weight:800;color:#111827}
+    .p-stat-lbl{font-size:11px;color:#6b7280;margin-top:2px}
+    .status-badge{padding:6px 16px;border-radius:20px;font-size:12px;font-weight:700}
+    .s-overloaded{background:#fee2e2;color:#991b1b}
+    .s-available{background:#dcfce7;color:#166534}
+    .s-busy{background:#fef3c7;color:#92400e}
+    /* METRICS ROW */
+    .metrics-strip{display:grid;grid-template-columns:repeat(5,1fr);gap:16px;margin-bottom:24px}
+    .metric-card{background:#fff;border-radius:12px;border:1px solid #e5e7eb;padding:16px 18px}
+    .metric-card-val{font-size:22px;font-weight:800;color:#111827}
+    .metric-card-lbl{font-size:11px;color:#6b7280;margin-top:3px}
+    .metric-card-sub{font-size:11px;margin-top:6px}
+    /* TWO COL */
+    .two-col{display:grid;grid-template-columns:1fr 340px;gap:20px}
+    /* BANDWIDTH TIMELINE */
+    .card{background:#fff;border-radius:12px;border:1px solid #e5e7eb;overflow:hidden;margin-bottom:20px}
+    .card-header{padding:16px 20px;border-bottom:1px solid #f3f4f6;display:flex;align-items:center;justify-content:space-between}
+    .card-title{font-size:14px;font-weight:700;color:#111827}
+    .card-body{padding:16px 20px}
+    /* WEEK BARS */
+    .week-chart{display:flex;gap:8px;align-items:flex-end;height:120px}
+    .week-col{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px}
+    .week-bar-wrap{flex:1;width:100%;display:flex;align-items:flex-end}
+    .week-bar{width:100%;border-radius:6px 6px 0 0;min-height:4px;transition:height .3s}
+    .wb-green{background:#22c55e} .wb-yellow{background:#f59e0b} .wb-red{background:#ef4444}
+    .week-label{font-size:10px;color:#9ca3af;text-align:center}
+    .week-pct{font-size:11px;font-weight:700;text-align:center}
+    /* JIRA TABLE */
+    .jira-table{width:100%;border-collapse:collapse}
+    .jira-table th{text-align:left;padding:10px 12px;font-size:11px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.5px;border-bottom:2px solid #f3f4f6;background:#fafafa}
+    .jira-table td{padding:10px 12px;font-size:13px;color:#374151;border-bottom:1px solid #f3f4f6;vertical-align:middle}
+    .jira-table tr:last-child td{border-bottom:none}
+    .jira-table tr:hover td{background:#fafafa}
+    .ticket-key{font-family:monospace;font-size:12px;font-weight:600;color:#4f8ef7;white-space:nowrap}
+    .ticket-summary{max-width:280px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .status-pill{padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600}
+    .sp-progress{background:#dbeafe;color:#1e40af}
+    .sp-review{background:#e9d5ff;color:#6b21a8}
+    .sp-blocked{background:#fee2e2;color:#991b1b}
+    .sp-done{background:#dcfce7;color:#166534}
+    .sp-todo{background:#f3f4f6;color:#6b7280}
+    .priority-dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:4px}
+    .pr-high{background:#ef4444} .pr-medium{background:#f59e0b} .pr-low{background:#22c55e}
+    /* ALLOCATION PIE ALT */
+    .alloc-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid #f3f4f6}
+    .alloc-row:last-child{border-bottom:none}
+    .alloc-project{font-size:13px;color:#374151;font-weight:500}
+    .alloc-bar-wrap{flex:1;margin:0 16px;height:8px;background:#f3f4f6;border-radius:99px;overflow:hidden}
+    .alloc-bar{height:100%;border-radius:99px}
+    .ab-1{background:#6366f1} .ab-2{background:#22c55e} .ab-3{background:#f59e0b}
+    .alloc-pct{font-size:12px;font-weight:700;min-width:36px;text-align:right}
+    /* LEAVE HISTORY */
+    .leave-item{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid #f3f4f6}
+    .leave-item:last-child{border-bottom:none}
+    .leave-type-badge{padding:3px 10px;border-radius:6px;font-size:11px;font-weight:600}
+    .lt-planned{background:#eff6ff;color:#1d4ed8}
+    .lt-sick{background:#fff7ed;color:#c2410c}
+    .lt-comp{background:#fdf4ff;color:#7e22ce}
+    .leave-dates{font-size:13px;color:#374151}
+    .leave-dur{font-size:11px;color:#9ca3af;margin-top:2px}
+    .leave-status-badge{margin-left:auto;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600}
+    .ls-approved{background:#dcfce7;color:#166534}
+    .ls-pending{background:#fef3c7;color:#92400e}
+    /* TABS */
+    .tabs{display:flex;gap:0;border-bottom:2px solid #f3f4f6;margin-bottom:16px}
+    .tab{padding:10px 20px;font-size:13px;font-weight:500;color:#6b7280;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px}
+    .tab.active{color:#4f8ef7;border-bottom-color:#4f8ef7;font-weight:600}
+    .filter-row{display:flex;gap:8px;margin-bottom:12px;align-items:center}
+    .filter-select{padding:6px 10px;border-radius:8px;border:1px solid #d1d5db;background:#fff;font-size:12px;color:#374151}
+    .search-input{padding:6px 10px;border-radius:8px;border:1px solid #d1d5db;background:#fff;font-size:12px;color:#374151;width:180px}
+    .sp-count{font-size:11px;color:#9ca3af;background:#f3f4f6;border-radius:4px;padding:2px 6px;margin-left:auto}
+  </style>
+</head>
+<body>
+
+<aside class="sidebar">
+  <div class="sidebar-logo">Band<span>Viz</span></div>
+  <nav class="sidebar-nav">
+    <div class="nav-section-label">Overview</div>
+    <a href="00-home.html"            class="nav-item"><span class="icon">🏠</span> Home</a>
+    <a href="01-team-dashboard.html"  class="nav-item"><span class="icon">📊</span> Team Dashboard</a>
+    <a href="02-developer-detail.html"class="nav-item active"><span class="icon">👤</span> Developer Detail</a>
+    <div class="nav-section-label" style="margin-top:8px">Planning</div>
+    <a href="03-leave-calendar.html"  class="nav-item"><span class="icon">📅</span> Leave Calendar</a>
+    <a href="04-bandwidth-planner.html"class="nav-item"><span class="icon">⚡</span> Bandwidth Planner</a>
+    <div class="nav-section-label" style="margin-top:8px">Integrations</div>
+    <a href="05-jira-sync.html"       class="nav-item"><span class="icon">🔗</span> Jira Sync</a>
+    <a href="06-settings.html"        class="nav-item"><span class="icon">⚙️</span> Settings</a>
+  </nav>
+  <div class="sidebar-footer">
+    <div class="avatar-small">RM</div>
+    <div>
+      <div class="footer-user-name">Ravi M.</div>
+      <div class="footer-user-role">Engineering Manager</div>
+    </div>
+  </div>
+</aside>
+
+<main class="main">
+  <div class="topbar">
+    <div class="topbar-left" style="gap:14px">
+      <a href="01-team-dashboard.html" class="back-btn">← Back</a>
+      <div>
+        <h1>Arjun Kumar</h1>
+        <p>Senior Backend Engineer · Post-Sales Engineering</p>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <button class="btn btn-danger">Mark On Leave</button>
+      <button class="btn btn-outline">⬇ Export</button>
+      <button class="btn btn-primary">Edit Developer</button>
+    </div>
+  </div>
+
+  <div class="content">
+
+    <!-- PROFILE HEADER -->
+    <div class="profile-header">
+      <div class="profile-avatar">AK</div>
+      <div class="profile-info">
+        <div class="profile-name">Arjun Kumar</div>
+        <div class="profile-role">Senior Backend Engineer · Employee ID #1042</div>
+        <div class="profile-tags">
+          <span class="profile-tag tag-blue">Java Spring</span>
+          <span class="profile-tag tag-purple">Kafka</span>
+          <span class="profile-tag tag-green">PostgreSQL</span>
+          <span class="profile-tag tag-orange">Redis</span>
+          <span class="profile-tag tag-blue">REST APIs</span>
+        </div>
+      </div>
+      <div class="profile-stats">
+        <div class="p-stat">
+          <div class="p-stat-val">40h</div>
+          <div class="p-stat-lbl">Weekly Capacity</div>
+        </div>
+        <div class="p-stat">
+          <div class="p-stat-val">38h</div>
+          <div class="p-stat-lbl">Currently Booked</div>
+        </div>
+        <div class="p-stat">
+          <div class="p-stat-val">2h</div>
+          <div class="p-stat-lbl">Available</div>
+        </div>
+      </div>
+      <span class="status-badge s-overloaded" style="margin-left:20px">Overloaded</span>
+    </div>
+
+    <!-- METRICS STRIP -->
+    <div class="metrics-strip">
+      <div class="metric-card">
+        <div class="metric-card-val" style="color:#dc2626">95%</div>
+        <div class="metric-card-lbl">Bandwidth Used</div>
+        <div class="metric-card-sub" style="color:#dc2626">⚠ Above 80% threshold</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-card-val">8</div>
+        <div class="metric-card-lbl">Open Tickets</div>
+        <div class="metric-card-sub" style="color:#6b7280">Sprint 42</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-card-val">34</div>
+        <div class="metric-card-lbl">Story Points</div>
+        <div class="metric-card-sub" style="color:#6b7280">Assigned this sprint</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-card-val">1</div>
+        <div class="metric-card-lbl">Blocked Ticket</div>
+        <div class="metric-card-sub" style="color:#dc2626">Needs attention</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-card-val">0</div>
+        <div class="metric-card-lbl">Leave Days</div>
+        <div class="metric-card-sub" style="color:#6b7280">This sprint</div>
+      </div>
+    </div>
+
+    <div class="two-col">
+      <!-- LEFT -->
+      <div>
+        <!-- BANDWIDTH TIMELINE -->
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Bandwidth Timeline (Last 8 Weeks)</span>
+            <select class="filter-select">
+              <option>Last 8 Weeks</option>
+              <option>Last 3 Months</option>
+              <option>This Quarter</option>
+            </select>
+          </div>
+          <div class="card-body">
+            <div class="week-chart">
+              <div class="week-col">
+                <div class="week-pct" style="color:#16a34a">55%</div>
+                <div class="week-bar-wrap"><div class="week-bar wb-green" style="height:55%"></div></div>
+                <div class="week-label">W1</div>
+              </div>
+              <div class="week-col">
+                <div class="week-pct" style="color:#16a34a">60%</div>
+                <div class="week-bar-wrap"><div class="week-bar wb-green" style="height:60%"></div></div>
+                <div class="week-label">W2</div>
+              </div>
+              <div class="week-col">
+                <div class="week-pct" style="color:#d97706">70%</div>
+                <div class="week-bar-wrap"><div class="week-bar wb-yellow" style="height:70%"></div></div>
+                <div class="week-label">W3</div>
+              </div>
+              <div class="week-col">
+                <div class="week-pct" style="color:#d97706">78%</div>
+                <div class="week-bar-wrap"><div class="week-bar wb-yellow" style="height:78%"></div></div>
+                <div class="week-label">W4</div>
+              </div>
+              <div class="week-col">
+                <div class="week-pct" style="color:#d97706">75%</div>
+                <div class="week-bar-wrap"><div class="week-bar wb-yellow" style="height:75%"></div></div>
+                <div class="week-label">W5</div>
+              </div>
+              <div class="week-col">
+                <div class="week-pct" style="color:#dc2626">85%</div>
+                <div class="week-bar-wrap"><div class="week-bar wb-red" style="height:85%"></div></div>
+                <div class="week-label">W6</div>
+              </div>
+              <div class="week-col">
+                <div class="week-pct" style="color:#dc2626">90%</div>
+                <div class="week-bar-wrap"><div class="week-bar wb-red" style="height:90%"></div></div>
+                <div class="week-label">W7</div>
+              </div>
+              <div class="week-col">
+                <div class="week-pct" style="color:#dc2626">95%</div>
+                <div class="week-bar-wrap"><div class="week-bar wb-red" style="height:95%"></div></div>
+                <div class="week-label">W8 ←</div>
+              </div>
+            </div>
+            <div style="display:flex;gap:16px;margin-top:12px;padding-top:12px;border-top:1px solid #f3f4f6">
+              <span style="font-size:11px;color:#6b7280;display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;border-radius:2px;background:#22c55e;display:inline-block"></span> ≤ 70% Healthy</span>
+              <span style="font-size:11px;color:#6b7280;display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;border-radius:2px;background:#f59e0b;display:inline-block"></span> 70–85% Busy</span>
+              <span style="font-size:11px;color:#6b7280;display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;border-radius:2px;background:#ef4444;display:inline-block"></span> &gt;85% Overloaded</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- JIRA TICKETS -->
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Jira Tickets</span>
+            <span class="sp-count">8 tickets · 34 story pts</span>
+          </div>
+          <div class="card-body" style="padding-top:0">
+            <div class="tabs">
+              <div class="tab active">All (8)</div>
+              <div class="tab">In Progress (5)</div>
+              <div class="tab">In Review (2)</div>
+              <div class="tab">Blocked (1)</div>
+            </div>
+            <div class="filter-row">
+              <input class="search-input" placeholder="Search tickets..." />
+              <select class="filter-select"><option>All Priorities</option><option>High</option><option>Medium</option><option>Low</option></select>
+              <select class="filter-select"><option>All Projects</option><option>CRM Core</option><option>Analytics</option></select>
+            </div>
+            <table class="jira-table">
+              <thead>
+                <tr>
+                  <th>Key</th>
+                  <th>Summary</th>
+                  <th>Status</th>
+                  <th>Priority</th>
+                  <th>SP</th>
+                  <th>Due</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><span class="ticket-key">VYMO-431</span></td>
+                  <td class="ticket-summary">Refactor analytics ingestion pipeline for scale</td>
+                  <td><span class="status-pill sp-progress">In Progress</span></td>
+                  <td><span class="priority-dot pr-high"></span>High</td>
+                  <td><strong>8</strong></td>
+                  <td>Mar 26</td>
+                </tr>
+                <tr>
+                  <td><span class="ticket-key">VYMO-418</span></td>
+                  <td class="ticket-summary">Fix race condition in session token refresh</td>
+                  <td><span class="status-pill sp-blocked">Blocked</span></td>
+                  <td><span class="priority-dot pr-high"></span>High</td>
+                  <td><strong>5</strong></td>
+                  <td>Mar 24</td>
+                </tr>
+                <tr>
+                  <td><span class="ticket-key">VYMO-409</span></td>
+                  <td class="ticket-summary">Add pagination to /leads REST endpoint</td>
+                  <td><span class="status-pill sp-progress">In Progress</span></td>
+                  <td><span class="priority-dot pr-medium"></span>Medium</td>
+                  <td><strong>3</strong></td>
+                  <td>Mar 25</td>
+                </tr>
+                <tr>
+                  <td><span class="ticket-key">VYMO-403</span></td>
+                  <td class="ticket-summary">Integrate Kafka consumer for event streaming</td>
+                  <td><span class="status-pill sp-review">In Review</span></td>
+                  <td><span class="priority-dot pr-high"></span>High</td>
+                  <td><strong>8</strong></td>
+                  <td>Mar 24</td>
+                </tr>
+                <tr>
+                  <td><span class="ticket-key">VYMO-397</span></td>
+                  <td class="ticket-summary">Optimize DB query in activity feed aggregator</td>
+                  <td><span class="status-pill sp-progress">In Progress</span></td>
+                  <td><span class="priority-dot pr-medium"></span>Medium</td>
+                  <td><strong>5</strong></td>
+                  <td>Mar 27</td>
+                </tr>
+                <tr>
+                  <td><span class="ticket-key">VYMO-388</span></td>
+                  <td class="ticket-summary">Write unit tests for CRM service layer</td>
+                  <td><span class="status-pill sp-progress">In Progress</span></td>
+                  <td><span class="priority-dot pr-low"></span>Low</td>
+                  <td><strong>2</strong></td>
+                  <td>Mar 28</td>
+                </tr>
+                <tr>
+                  <td><span class="ticket-key">VYMO-379</span></td>
+                  <td class="ticket-summary">CRM API: add bulk export endpoint</td>
+                  <td><span class="status-pill sp-review">In Review</span></td>
+                  <td><span class="priority-dot pr-medium"></span>Medium</td>
+                  <td><strong>2</strong></td>
+                  <td>Mar 25</td>
+                </tr>
+                <tr>
+                  <td><span class="ticket-key">VYMO-362</span></td>
+                  <td class="ticket-summary">Setup Redis cache for session data</td>
+                  <td><span class="status-pill sp-progress">In Progress</span></td>
+                  <td><span class="priority-dot pr-medium"></span>Medium</td>
+                  <td><strong>1</strong></td>
+                  <td>Mar 28</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT -->
+      <div style="display:flex;flex-direction:column;gap:20px">
+
+        <!-- ALLOCATION BY PROJECT -->
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Allocation by Project</span>
+          </div>
+          <div class="card-body">
+            <div class="alloc-row">
+              <span class="alloc-project">CRM Core</span>
+              <div class="alloc-bar-wrap"><div class="alloc-bar ab-1" style="width:50%"></div></div>
+              <span class="alloc-pct" style="color:#6366f1">50%</span>
+            </div>
+            <div class="alloc-row">
+              <span class="alloc-project">Analytics 2.0</span>
+              <div class="alloc-bar-wrap"><div class="alloc-bar ab-2" style="width:35%"></div></div>
+              <span class="alloc-pct" style="color:#22c55e">35%</span>
+            </div>
+            <div class="alloc-row">
+              <span class="alloc-project">Tech Debt</span>
+              <div class="alloc-bar-wrap"><div class="alloc-bar ab-3" style="width:10%"></div></div>
+              <span class="alloc-pct" style="color:#f59e0b">10%</span>
+            </div>
+            <div style="padding-top:12px;border-top:1px solid #f3f4f6;margin-top:4px;font-size:12px;color:#dc2626;font-weight:600">
+              ⚠ Total: 95% · 5% over recommended
+            </div>
+          </div>
+        </div>
+
+        <!-- LEAVE HISTORY -->
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Leave History</span>
+            <a href="03-leave-calendar.html" style="font-size:12px;color:#4f8ef7;text-decoration:none;font-weight:500">Calendar →</a>
+          </div>
+          <div class="card-body">
+            <div class="leave-item">
+              <div>
+                <span class="leave-type-badge lt-planned">Planned</span>
+              </div>
+              <div>
+                <div class="leave-dates">Dec 23 – Dec 30, 2025</div>
+                <div class="leave-dur">8 days · Year-end holiday</div>
+              </div>
+              <span class="leave-status-badge ls-approved" style="margin-left:auto">Approved</span>
+            </div>
+            <div class="leave-item">
+              <div>
+                <span class="leave-type-badge lt-sick">Sick</span>
+              </div>
+              <div>
+                <div class="leave-dates">Feb 10 – Feb 11, 2026</div>
+                <div class="leave-dur">2 days</div>
+              </div>
+              <span class="leave-status-badge ls-approved" style="margin-left:auto">Approved</span>
+            </div>
+            <div class="leave-item">
+              <div>
+                <span class="leave-type-badge lt-comp">Comp-off</span>
+              </div>
+              <div>
+                <div class="leave-dates">Mar 7, 2026</div>
+                <div class="leave-dur">1 day</div>
+              </div>
+              <span class="leave-status-badge ls-approved" style="margin-left:auto">Approved</span>
+            </div>
+            <div style="padding-top:12px;border-top:1px solid #f3f4f6;margin-top:4px">
+              <button class="btn btn-outline" style="width:100%;justify-content:center;font-size:12px">+ Apply Leave</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- QUICK INFO -->
+        <div class="card">
+          <div class="card-header"><span class="card-title">Contact & Info</span></div>
+          <div class="card-body" style="display:flex;flex-direction:column;gap:10px">
+            <div style="display:flex;justify-content:space-between;font-size:13px">
+              <span style="color:#6b7280">Email</span>
+              <span style="color:#374151;font-weight:500">arjun.k@vymo.com</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:13px">
+              <span style="color:#6b7280">Reports to</span>
+              <span style="color:#374151;font-weight:500">Ravi M.</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:13px">
+              <span style="color:#6b7280">Joined</span>
+              <span style="color:#374151;font-weight:500">Aug 2022</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:13px">
+              <span style="color:#6b7280">Jira Username</span>
+              <span style="color:#4f8ef7;font-weight:500">@arjun.kumar</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:13px">
+              <span style="color:#6b7280">Leave Balance</span>
+              <span style="color:#374151;font-weight:500">12 days remaining</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</main>
+</body>
+</html>
