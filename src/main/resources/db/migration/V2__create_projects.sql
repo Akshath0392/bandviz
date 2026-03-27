@@ -1,0 +1,8 @@
+CREATE TABLE IF NOT EXISTS projects (
+    id BIGSERIAL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL UNIQUE,
+    jira_project_key VARCHAR(20) UNIQUE,
+    color VARCHAR(10),
+    target_utilization_pct INTEGER NOT NULL DEFAULT 70,
+    active BOOLEAN NOT NULL DEFAULT TRUE
+);

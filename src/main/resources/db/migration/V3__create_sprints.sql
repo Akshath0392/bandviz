@@ -1,0 +1,7 @@
+CREATE TABLE IF NOT EXISTS sprints (
+    id BIGSERIAL PRIMARY KEY,
+    name VARCHAR(50) NOT NULL UNIQUE,
+    start_date DATE NOT NULL,
+    end_date DATE NOT NULL,
+    active BOOLEAN NOT NULL DEFAULT FALSE
+);

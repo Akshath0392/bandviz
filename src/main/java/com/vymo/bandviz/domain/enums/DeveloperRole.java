@@ -1,0 +1,15 @@
+package com.vymo.bandviz.domain.enums;
+
+public enum DeveloperRole {
+    ENGINEERING_MANAGER,
+    TECH_LEAD,
+    DEVELOPER,
+    PROJECT_MANAGER,
+    SENIOR_BACKEND_ENGINEER,
+    BACKEND_ENGINEER,
+    SENIOR_FRONTEND_ENGINEER,
+    FRONTEND_ENGINEER,
+    FULL_STACK_ENGINEER,
+    QA_ENGINEER,
+    DEVOPS_ENGINEER
+}

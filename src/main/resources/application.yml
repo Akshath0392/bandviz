@@ -1,0 +1,51 @@
+spring:
+  application:
+    name: bandviz
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/bandviz
+    username: ${DB_USERNAME:bandviz}
+    password: ${DB_PASSWORD:bandviz}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+
+bandviz:
+  jira:
+    base-url: ${JIRA_BASE_URL:https://your-org.atlassian.net}
+    email: ${JIRA_EMAIL:your-email@company.com}
+    api-token: ${JIRA_API_TOKEN:your-api-token}
+    sync-enabled: ${JIRA_SYNC_ENABLED:false}
+    project-keys: ${JIRA_PROJECT_KEYS:}
+
+  bandwidth:
+    overload-threshold: 85
+    busy-threshold: 70
+    default-weekly-capacity-hours: 40
+
+  planning:
+    default-window-days: 14
+
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    tags-sorter: alpha
+
+logging:
+  level:
+    com.vymo.bandviz: DEBUG
+    org.springframework.web: INFO

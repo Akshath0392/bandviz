@@ -1,0 +1,9 @@
+CREATE TABLE IF NOT EXISTS developers (
+    id BIGSERIAL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    email VARCHAR(150) NOT NULL UNIQUE,
+    role VARCHAR(50) NOT NULL,
+    weekly_capacity_hours INTEGER NOT NULL DEFAULT 40,
+    jira_username VARCHAR(100) UNIQUE,
+    active BOOLEAN NOT NULL DEFAULT TRUE
+);
