@@ -1,11 +1,13 @@
 package com.vymo.bandviz.service;
 
 import com.vymo.bandviz.domain.Developer;
+import com.vymo.bandviz.domain.Team;
 import com.vymo.bandviz.dto.request.DeveloperRequest;
 import com.vymo.bandviz.dto.response.DeveloperResponse;
 import com.vymo.bandviz.exception.BusinessException;
 import com.vymo.bandviz.exception.ResourceNotFoundException;
 import com.vymo.bandviz.repository.DeveloperRepository;
+import com.vymo.bandviz.repository.TeamRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,11 +20,19 @@ import java.util.List;
 public class DeveloperService {
 
     private final DeveloperRepository developerRepository;
+    private final TeamRepository teamRepository;
 
-    public List<DeveloperResponse> findAll(boolean activeOnly) {
-        List<Developer> developers = activeOnly
-                ? developerRepository.findAllByActiveTrue()
-                : developerRepository.findAll();
+    public List<DeveloperResponse> findAll(boolean activeOnly, Long teamId) {
+        List<Developer> developers;
+        if (teamId != null) {
+            developers = activeOnly
+                    ? developerRepository.findAllByActiveTrueAndTeamId(teamId)
+                    : developerRepository.findAllByTeamId(teamId);
+        } else {
+            developers = activeOnly
+                    ? developerRepository.findAllByActiveTrue()
+                    : developerRepository.findAll();
+        }
         return developers.stream().map(this::toResponse).toList();
     }
 
@@ -41,6 +51,7 @@ public class DeveloperService {
                 .role(request.getRole())
                 .weeklyCapacityHours(request.getWeeklyCapacityHours())
                 .jiraUsername(request.getJiraUsername())
+                .team(resolveTeam(request.getTeamId()))
                 .active(true)
                 .build();
         return toResponse(developerRepository.save(developer));
@@ -49,11 +60,15 @@ public class DeveloperService {
     @Transactional
     public DeveloperResponse update(Long id, DeveloperRequest request) {
         Developer developer = getOrThrow(id);
+        if (developerRepository.existsByEmailAndIdNot(request.getEmail(), id)) {
+            throw new BusinessException("A developer with email " + request.getEmail() + " already exists");
+        }
         developer.setName(request.getName());
         developer.setEmail(request.getEmail());
         developer.setRole(request.getRole());
         developer.setWeeklyCapacityHours(request.getWeeklyCapacityHours());
         developer.setJiraUsername(request.getJiraUsername());
+        developer.setTeam(resolveTeam(request.getTeamId()));
         return toResponse(developerRepository.save(developer));
     }
 
@@ -77,7 +92,17 @@ public class DeveloperService {
         r.setRole(d.getRole());
         r.setWeeklyCapacityHours(d.getWeeklyCapacityHours());
         r.setJiraUsername(d.getJiraUsername());
+        r.setTeamId(d.getTeam() != null ? d.getTeam().getId() : null);
+        r.setTeamName(d.getTeam() != null ? d.getTeam().getName() : null);
         r.setActive(d.getActive());
         return r;
+    }
+
+    private Team resolveTeam(Long teamId) {
+        if (teamId == null) {
+            return null;
+        }
+        return teamRepository.findById(teamId)
+                .orElseThrow(() -> new ResourceNotFoundException("Team not found: " + teamId));
     }
 }

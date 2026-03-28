@@ -24,8 +24,9 @@ public class DeveloperController {
     @GetMapping
     @Operation(summary = "List all developers")
     public List<DeveloperResponse> findAll(
-            @RequestParam(defaultValue = "true") boolean activeOnly) {
-        return developerService.findAll(activeOnly);
+            @RequestParam(defaultValue = "true") boolean activeOnly,
+            @RequestParam(required = false) Long teamId) {
+        return developerService.findAll(activeOnly, teamId);
     }
 
     @GetMapping("/{id}")

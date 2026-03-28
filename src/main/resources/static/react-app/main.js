@@ -236,17 +236,17 @@ function Nav() {
   const page = document.body.dataset.page;
   const items = [
     { section: "Overview", links: [
-      { href: "/home.html", page: "home", icon: "🏠", label: "Home" },
-      { href: "/team-dashboard.html", page: "dashboard", icon: "📊", label: "Team Dashboard" },
-      { href: "/developer-detail.html", page: "developer", icon: "👤", label: "Developer Detail" }
+      { href: "/home", page: "home", icon: "🏠", label: "Home" },
+      { href: "/team-dashboard", page: "dashboard", icon: "📊", label: "Team Dashboard" },
+      { href: "/developer-detail", page: "developer", icon: "👤", label: "Developer Detail" }
     ]},
     { section: "Planning", links: [
-      { href: "/leave-calendar.html", page: "leaves", icon: "📅", label: "Leave Calendar" },
-      { href: "/capacity-planner.html", page: "planner", icon: "⚡", label: "Capacity Planner" }
+      { href: "/leave-calendar", page: "leaves", icon: "📅", label: "Leave Calendar" },
+      { href: "/capacity-planner", page: "planner", icon: "⚡", label: "Capacity Planner" }
     ]},
     { section: "Integrations", links: [
-      { href: "/jira-sync.html", page: "jira", icon: "🔗", label: "Jira Sync" },
-      { href: "/settings.html", page: "settings", icon: "⚙️", label: "Settings" }
+      { href: "/jira-sync", page: "jira", icon: "🔗", label: "Jira Sync" },
+      { href: "/settings", page: "settings", icon: "⚙️", label: "Settings" }
     ]}
   ];
 
@@ -428,8 +428,8 @@ function HomePage() {
       subtitle=${topbarSubtitle}
       actions=${html`
         <span className="chip">${planningLabel(dashboard)}</span>
-        <a className="btn btn-secondary" href="/jira-sync.html">🔔 ${alerts.length} Alert${alerts.length === 1 ? "" : "s"}</a>
-        <a className="btn btn-primary" href="/capacity-planner.html">Plan Bandwidth</a>
+        <a className="btn btn-secondary" href="/jira-sync">🔔 ${alerts.length} Alert${alerts.length === 1 ? "" : "s"}</a>
+        <a className="btn btn-primary" href="/capacity-planner">Plan Bandwidth</a>
       `}
       banner=${state.banner}
     >
@@ -443,8 +443,8 @@ function HomePage() {
               : "Create a planning window, add allocations, and sync Jira to unlock the dashboard overview."}
           </div>
           <div className="hero-actions">
-            <a className="btn btn-primary" href="/team-dashboard.html">View Dashboard</a>
-            <a className="btn btn-secondary" href="/capacity-planner.html">${dashboard?.planningMode === "SPRINT" ? "Plan Next Sprint" : "Plan Next Window"}</a>
+            <a className="btn btn-primary" href="/team-dashboard">View Dashboard</a>
+            <a className="btn btn-secondary" href="/capacity-planner">${dashboard?.planningMode === "SPRINT" ? "Plan Next Sprint" : "Plan Next Window"}</a>
           </div>
         </div>
         <div className="home-hero-right">
@@ -518,12 +518,12 @@ function HomePage() {
             <div className="card-header"><span className="card-title">Quick Actions</span></div>
             <div className="card-body">
               <div className="quick-grid">
-                <a href="/team-dashboard.html" className="quick-item"><span className="quick-item-icon">📊</span><span className="quick-item-label">Team Dashboard</span><span className="quick-item-sub">All ${totalDevelopers || 0} devs</span></a>
-                <a href="/leave-calendar.html" className="quick-item"><span className="quick-item-icon">📅</span><span className="quick-item-label">Leave Calendar</span><span className="quick-item-sub">${onLeaveCount} on leave</span></a>
-                <a href="/capacity-planner.html" className="quick-item"><span className="quick-item-icon">⚡</span><span className="quick-item-label">Plan Bandwidth</span><span className="quick-item-sub">Allocate to projects</span></a>
-                <a href="/jira-sync.html" className="quick-item"><span className="quick-item-icon">🔗</span><span className="quick-item-label">Jira Sync</span><span className="quick-item-sub">${jiraStatus?.lastSyncedAt ? `Synced ${formatRelativeTime(jiraStatus.lastSyncedAt)}` : "Integration status"}</span></a>
-                <a href="/developer-detail.html" className="quick-item"><span className="quick-item-icon">👤</span><span className="quick-item-label">Dev Detail</span><span className="quick-item-sub">Drill down</span></a>
-                <a href="/settings.html" className="quick-item"><span className="quick-item-icon">⚙️</span><span className="quick-item-label">Settings</span><span className="quick-item-sub">Manage team</span></a>
+                <a href="/team-dashboard" className="quick-item"><span className="quick-item-icon">📊</span><span className="quick-item-label">Team Dashboard</span><span className="quick-item-sub">All ${totalDevelopers || 0} devs</span></a>
+                <a href="/leave-calendar" className="quick-item"><span className="quick-item-icon">📅</span><span className="quick-item-label">Leave Calendar</span><span className="quick-item-sub">${onLeaveCount} on leave</span></a>
+                <a href="/capacity-planner" className="quick-item"><span className="quick-item-icon">⚡</span><span className="quick-item-label">Plan Bandwidth</span><span className="quick-item-sub">Allocate to projects</span></a>
+                <a href="/jira-sync" className="quick-item"><span className="quick-item-icon">🔗</span><span className="quick-item-label">Jira Sync</span><span className="quick-item-sub">${jiraStatus?.lastSyncedAt ? `Synced ${formatRelativeTime(jiraStatus.lastSyncedAt)}` : "Integration status"}</span></a>
+                <a href="/developer-detail" className="quick-item"><span className="quick-item-icon">👤</span><span className="quick-item-label">Dev Detail</span><span className="quick-item-sub">Drill down</span></a>
+                <a href="/settings" className="quick-item"><span className="quick-item-icon">⚙️</span><span className="quick-item-label">Settings</span><span className="quick-item-sub">Manage team</span></a>
               </div>
             </div>
           </section>
@@ -531,7 +531,7 @@ function HomePage() {
           <section className="card">
             <div className="card-header">
               <span className="card-title">Team Health by Project</span>
-              <a href="/team-dashboard.html" className="card-link">View all →</a>
+              <a href="/team-dashboard" className="card-link">View all →</a>
             </div>
             <div className="card-body">
               ${healthRows.length
@@ -695,7 +695,7 @@ function DeveloperDashboardCard({ row }) {
             ? projectTags.map((item) => html`<span key=${`${row.developerId}-${item.projectName}`} className="project-tag">${item.projectName}</span>`)
             : html`<span className="project-tag project-tag-muted">Unassigned</span>`}
         </div>
-        <a className="card-action" href="/developer-detail.html">View Details</a>
+        <a className="card-action" href=${`/developer-detail?developerId=${row.developerId}`}>View Details</a>
       </div>
     </div>
   `;
@@ -774,7 +774,7 @@ function DashboardPage() {
       actions=${html`
         <span className="chip">${badgeText}</span>
         <a className="btn btn-secondary" href="/settings.html">Export</a>
-        <a className="btn btn-primary" href="/developer-detail.html">Add Developer</a>
+        <a className="btn btn-primary" href="/developer-detail">Add Developer</a>
       `}
       banner=${state.banner}
     >
@@ -887,9 +887,13 @@ function DeveloperPage() {
         if (ignore) return;
         const nextDevs = devList.status === "fulfilled" ? devList.value : [];
         const nextBw = bwList.status === "fulfilled" ? bwList.value : [];
+        const requestedDeveloperId = new URLSearchParams(window.location.search).get("developerId");
+        const requestedExists = requestedDeveloperId
+          ? nextDevs.some((item) => String(item.id) === String(requestedDeveloperId))
+          : false;
         setDevs(nextDevs);
         setBandwidth(nextBw);
-        setSelectedId(nextDevs[0]?.id ? String(nextDevs[0].id) : "");
+        setSelectedId(requestedExists ? String(requestedDeveloperId) : (nextDevs[0]?.id ? String(nextDevs[0].id) : ""));
         if (!nextDevs.length) {
           setBanner({ message: "No developers are configured yet. Add developers to use the detail view.", tone: "warning" });
         } else {
@@ -968,7 +972,7 @@ function DeveloperPage() {
     <${PageShell}
       title=${dev ? dev.name : "Developer Detail"}
       subtitle=${dev ? `${humanize(dev.role)} · ${dev.email}` : "Choose a developer to view current capacity and allocations."}
-      leading=${html`<a href="/team-dashboard.html" className="back-btn">← Back</a>`}
+      leading=${html`<a href="/team-dashboard" className="back-btn">← Back</a>`}
       actions=${html`
         <label style=${{ fontSize: "12px", color: "#6b7280" }}>
           Developer
@@ -979,8 +983,8 @@ function DeveloperPage() {
           </select>
         </label>
         <button className="btn btn-danger" type="button">Mark On Leave</button>
-        <a className="btn btn-secondary" href="/team-dashboard.html">Export</a>
-        <a className="btn btn-primary" href="/capacity-planner.html">Edit Developer</a>
+        <a className="btn btn-secondary" href="/team-dashboard">Export</a>
+        <a className="btn btn-primary" href="/capacity-planner">Edit Developer</a>
       `}
       banner=${banner}
     >
@@ -1170,7 +1174,7 @@ function DeveloperPage() {
           <section className="card">
             <div className="card-header">
               <span className="card-title">Leave History</span>
-              <a href="/leave-calendar.html" className="card-action">Calendar →</a>
+              <a href="/leave-calendar" className="card-action">Calendar →</a>
             </div>
             <div className="card-body">
               ${leaveHistory.length
@@ -1186,7 +1190,7 @@ function DeveloperPage() {
                   `)
                 : html`<div className="notice">No leave history available.</div>`}
               <div style=${{ paddingTop: "12px", borderTop: "1px solid #f3f4f6", marginTop: "8px" }}>
-                <a className="btn btn-secondary" href="/leave-calendar.html" style=${{ width: "100%", justifyContent: "center" }}>+ Apply Leave</a>
+                <a className="btn btn-secondary" href="/leave-calendar" style=${{ width: "100%", justifyContent: "center" }}>+ Apply Leave</a>
               </div>
             </div>
           </section>
@@ -1919,7 +1923,7 @@ function JiraPage() {
       subtitle="Integration status, project mapping & ticket breakdown"
       actions=${html`
         <span className="muted-inline">Last synced: <strong>${formatRelativeTime(status?.lastSyncedAt)}</strong></span>
-        <a className="btn btn-secondary" href="/settings.html">⚙ Configure</a>
+        <a className="btn btn-secondary" href="/settings">⚙ Configure</a>
         <button className="btn btn-primary" onClick=${runSync} disabled=${running}>${running ? "Running..." : "↻ Sync Now"}</button>
       `}
       banner=${banner}
@@ -1954,7 +1958,7 @@ function JiraPage() {
           <section className="card">
             <div className="card-header">
               <span className="card-title">Project Mapping</span>
-              <a className="btn btn-secondary" href="/settings.html">+ Add Project</a>
+              <a className="btn btn-secondary" href="/settings">+ Add Project</a>
             </div>
             <div className="table-wrap">
               <table className="map-table">
@@ -1977,7 +1981,7 @@ function JiraPage() {
                           <td className="ticket-count">${project.openTickets}</td>
                           <td className="last-sync">${formatRelativeTime(project.lastSyncedAt)}</td>
                           <td><span className=${`sync-status ${project.syncState === "SYNCED" ? "ss-ok" : project.syncState === "STALE" ? "ss-warn" : "ss-idle"}`}>${project.syncState === "SYNCED" ? "✓ Synced" : project.syncState === "STALE" ? "⚠ Stale" : "… Pending"}</span></td>
-                          <td><a href="/settings.html" className="card-action">Edit</a></td>
+                          <td><a href="/settings" className="card-action">Edit</a></td>
                         </tr>
                       `)
                     : html`<tr><td colSpan="6" className="notice">No Jira project mappings are configured yet.</td></tr>`}
@@ -2033,7 +2037,7 @@ function JiraPage() {
               <div className="config-row"><div><div className="config-label">Project Keys Source</div><div className="config-sub">Explicit configuration or active mapped projects</div></div><span className="config-value">${status?.projectKeys?.length ? "Configured" : "From BandViz projects"}</span></div>
               <div className="config-row"><div><div className="config-label">Last Sync Status</div><div className="config-sub">Most recent backend sync result</div></div><span className="config-value config-value-wide">${status?.lastSyncStatus || "Never synced"}</span></div>
               <div style=${{ marginTop: "12px" }}>
-                <a className="btn btn-primary" href="/settings.html" style=${{ width: "100%", justifyContent: "center" }}>Open Configuration</a>
+                <a className="btn btn-primary" href="/settings" style=${{ width: "100%", justifyContent: "center" }}>Open Configuration</a>
               </div>
             </div>
           </section>
@@ -2090,7 +2094,7 @@ function SettingsPage() {
       subtitle="Manage team, projects, capacity defaults and notifications"
       actions=${html`
         <button className="btn btn-secondary" onClick=${() => window.location.reload()}>↺ Reset Defaults</button>
-        <a className="btn btn-primary" href="/home.html">💾 Save All</a>
+        <a className="btn btn-primary" href="/home">💾 Save All</a>
       `}
       banner=${state.banner}
     >
@@ -2116,7 +2120,7 @@ function SettingsPage() {
                 <div className="sc-title">Developers</div>
                 <div className="sc-sub">${state.devs.length} members · Profiles available to planning screens</div>
               </div>
-              <a className="btn btn-primary" href="/developer-detail.html" style=${{ fontSize: "12px", padding: "7px 12px" }}>+ Add Developer</a>
+              <a className="btn btn-primary" href="/developer-detail" style=${{ fontSize: "12px", padding: "7px 12px" }}>+ Add Developer</a>
             </div>
             <div className="sc-body">
               <table className="dev-table">
@@ -2165,7 +2169,7 @@ function SettingsPage() {
                 <div className="sc-title">Projects</div>
                 <div className="sc-sub">${state.projects.length} active projects</div>
               </div>
-              <a className="btn btn-primary" href="/capacity-planner.html" style=${{ fontSize: "12px", padding: "7px 12px" }}>+ Add Project</a>
+              <a className="btn btn-primary" href="/capacity-planner" style=${{ fontSize: "12px", padding: "7px 12px" }}>+ Add Project</a>
             </div>
             <div className="sc-body">
               <table className="proj-table">

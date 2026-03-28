@@ -19,6 +19,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDate;
+import java.util.Map;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -79,16 +80,16 @@ class BandwidthServiceTest {
 
         JiraTicket t1 = JiraTicket.builder().ticketKey("CRM-1").status(TicketStatus.IN_PROGRESS).storyPoints(8).build();
         JiraTicket t2 = JiraTicket.builder().ticketKey("CRM-2").status(TicketStatus.BLOCKED).storyPoints(5).build();
+        t1.setAssigneeJiraUsername("arjun@vymo.com");
+        t2.setAssigneeJiraUsername("arjun@vymo.com");
 
         when(developerRepository.findAllByActiveTrue()).thenReturn(List.of(d1, d2));
         when(leaveService.countWorkingDays(start, end)).thenReturn(10L);
-        when(assignmentRepository.findAllActiveOnDate(any(LocalDate.class))).thenReturn(List.of(a1, a2));
+        when(assignmentRepository.findAllActiveInRange(start, end)).thenReturn(List.of(a1, a2));
         when(leaveService.countApprovedLeaveDays(1L, start, end)).thenReturn(0L);
         when(leaveService.countApprovedLeaveDays(2L, start, end)).thenReturn(10L);
-        when(jiraTicketRepository.findAllByAssigneeJiraUsernameAndStatusNot("arjun@vymo.com", TicketStatus.DONE))
+        when(jiraTicketRepository.findAllByAssigneeJiraUsernameInAndStatusNot(List.of("arjun@vymo.com", "sid@vymo.com"), TicketStatus.DONE))
                 .thenReturn(List.of(t1, t2));
-        when(jiraTicketRepository.findAllByAssigneeJiraUsernameAndStatusNot("sid@vymo.com", TicketStatus.DONE))
-                .thenReturn(List.of());
 
         List<DeveloperBandwidthResponse> result = bandwidthService.computeForPeriod(start, end);
 
@@ -107,7 +108,7 @@ class BandwidthServiceTest {
     }
 
     @Test
-    void computeForPeriod_shouldUseMidpointDateAcrossMonthBoundary() {
+    void computeForPeriod_shouldQueryAssignmentsOverlappingTheWholeRange() {
         LocalDate start = LocalDate.of(2026, 3, 28);
         LocalDate end = LocalDate.of(2026, 4, 6);
 
@@ -121,14 +122,13 @@ class BandwidthServiceTest {
 
         when(developerRepository.findAllByActiveTrue()).thenReturn(List.of(d));
         when(leaveService.countWorkingDays(start, end)).thenReturn(6L);
-        when(assignmentRepository.findAllActiveOnDate(any(LocalDate.class))).thenReturn(List.of());
+        when(assignmentRepository.findAllActiveInRange(start, end)).thenReturn(List.of());
+        when(jiraTicketRepository.findAllByAssigneeJiraUsernameInAndStatusNot(List.of(), TicketStatus.DONE)).thenReturn(List.of());
         when(leaveService.countApprovedLeaveDays(1L, start, end)).thenReturn(0L);
 
         bandwidthService.computeForPeriod(start, end);
 
-        ArgumentCaptor<LocalDate> dateCaptor = ArgumentCaptor.forClass(LocalDate.class);
-        verify(assignmentRepository).findAllActiveOnDate(dateCaptor.capture());
-        assertEquals(LocalDate.of(2026, 4, 1), dateCaptor.getValue());
+        verify(assignmentRepository).findAllActiveInRange(start, end);
         assertTrue(true);
     }
 
@@ -149,7 +149,8 @@ class BandwidthServiceTest {
                 .thenReturn(new PlanningWindow("Current Planning Window", start, end, "KANBAN", true));
         when(developerRepository.findAllByActiveTrue()).thenReturn(List.of(d));
         when(leaveService.countWorkingDays(start, end)).thenReturn(10L);
-        when(assignmentRepository.findAllActiveOnDate(any(LocalDate.class))).thenReturn(List.of());
+        when(assignmentRepository.findAllActiveInRange(start, end)).thenReturn(List.of());
+        when(jiraTicketRepository.findAllByAssigneeJiraUsernameInAndStatusNot(List.of(), TicketStatus.DONE)).thenReturn(List.of());
         when(leaveService.countApprovedLeaveDays(1L, start, end)).thenReturn(0L);
 
         List<DeveloperBandwidthResponse> result = bandwidthService.computeForActiveWindow();

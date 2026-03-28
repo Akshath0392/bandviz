@@ -8,11 +8,18 @@ It provides:
 - Leave approval workflow and calendar
 - Bandwidth planner for project allocations
 - Jira sync status and on-demand sync
+- Team-based ownership mapping for projects and developers
 
 BandViz now supports mixed delivery models:
 - Sprint teams can plan against an active sprint
 - Kanban teams can plan against a rolling planning window
 - Projects can be marked as `SPRINT`, `KANBAN`, or `HYBRID`
+
+Ownership hierarchy:
+- `Project -> Team -> Developer -> Tickets`
+- Projects can be assigned to a team
+- Developers can be tagged to a team
+- Jira tickets can then be reviewed by developer, project, or team mapping
 
 ## Tech Stack
 
@@ -155,27 +162,34 @@ export ATLASSIAN_TEAM_NAMES="Collections BAU,Prod-Eng"
 
 ## Access URLs
 
-- Home: `http://localhost:8080/home.html`
-- Team Dashboard: `http://localhost:8080/team-dashboard.html`
-- Developer Detail: `http://localhost:8080/developer-detail.html`
-- Leave Calendar: `http://localhost:8080/leave-calendar.html`
-- Bandwidth Planner: `http://localhost:8080/capacity-planner.html`
-- Jira Sync: `http://localhost:8080/jira-sync.html`
-- Settings: `http://localhost:8080/settings.html`
+- Home: `http://localhost:8080/home`
+- Team Dashboard: `http://localhost:8080/team-dashboard`
+- Developer Detail: `http://localhost:8080/developer-detail`
+- Leave Calendar: `http://localhost:8080/leave-calendar`
+- Bandwidth Planner: `http://localhost:8080/capacity-planner`
+- Jira Sync: `http://localhost:8080/jira-sync`
+- Settings: `http://localhost:8080/settings`
 - Swagger UI: `http://localhost:8080/swagger-ui.html`
 - OpenAPI JSON: `http://localhost:8080/api-docs`
+
+Legacy `.html` page URLs still work and forward-compatible links now use the cleaner route-style endpoints above.
 
 ## Core APIs
 
 ### Developers
 - `GET /api/developers`
+- `GET /api/developers?teamId={id}`
 - `GET /api/developers/{id}`
 - `POST /api/developers`
 - `PUT /api/developers/{id}`
 - `DELETE /api/developers/{id}`
 
+Developer payloads also support:
+- `teamId`
+
 ### Projects
 - `GET /api/projects`
+- `GET /api/projects?teamId={id}`
 - `GET /api/projects/{id}`
 - `POST /api/projects`
 - `PUT /api/projects/{id}`
@@ -183,6 +197,24 @@ export ATLASSIAN_TEAM_NAMES="Collections BAU,Prod-Eng"
 
 Project payloads also support:
 - `deliveryMode` with values `SPRINT`, `KANBAN`, `HYBRID`
+- `teamId`
+
+### Teams
+- `GET /api/teams`
+- `GET /api/teams/{id}`
+- `POST /api/teams`
+- `PUT /api/teams/{id}`
+- `DELETE /api/teams/{id}`
+
+Team payloads:
+- `name`
+- `description`
+
+Example flow for Collections:
+1. Create a team like `Collections BAU`
+2. Assign relevant projects to that team with `teamId`
+3. Tag developers to the same team with `teamId`
+4. Review synced Jira tickets through the same ownership chain
 
 ### Project Allocations
 - `GET /api/project-allocations?developerId={id}`
@@ -211,6 +243,11 @@ Project payloads also support:
 - `GET /api/capacity?start=YYYY-MM-DD&end=YYYY-MM-DD`
 - `GET /api/dashboard-summary`
 - `GET /api/dashboard-summary?sprintId={id}`
+
+### Jira Tickets
+- `GET /api/jira-tickets?developerId={id}`
+- `GET /api/jira-tickets?projectId={id}`
+- `GET /api/jira-tickets?teamId={id}`
 
 Behavior:
 - If there is an active sprint, dashboard and capacity use that sprint window

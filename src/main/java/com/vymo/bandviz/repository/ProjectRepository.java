@@ -10,6 +10,10 @@ public interface ProjectRepository extends JpaRepository<Project, Long> {
 
     List<Project> findAllByActiveTrue();
 
+    List<Project> findAllByActiveTrueAndTeamId(Long teamId);
+
+    List<Project> findAllByTeamId(Long teamId);
+
     Optional<Project> findByJiraProjectKey(String jiraProjectKey);
 
     boolean existsByName(String name);

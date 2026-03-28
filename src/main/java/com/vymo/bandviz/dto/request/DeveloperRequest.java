@@ -22,4 +22,6 @@ public class DeveloperRequest {
     private Integer weeklyCapacityHours;
 
     private String jiraUsername;
+
+    private Long teamId;
 }

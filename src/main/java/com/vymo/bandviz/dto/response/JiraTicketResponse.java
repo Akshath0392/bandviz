@@ -20,6 +20,8 @@ public class JiraTicketResponse {
     private TicketPriority priority;
     private String projectKey;
     private String projectName;
+    private Long teamId;
+    private String teamName;
     private String sprintName;
     private String ticketUrl;
     private LocalDateTime lastSyncedAt;

@@ -11,5 +11,7 @@ public class DeveloperResponse {
     private DeveloperRole role;
     private Integer weeklyCapacityHours;
     private String jiraUsername;
+    private Long teamId;
+    private String teamName;
     private Boolean active;
 }

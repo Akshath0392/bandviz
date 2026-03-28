@@ -50,7 +50,10 @@ public class DashboardService {
                             + jiraTicketRepository.countByStatus(TicketStatus.IN_REVIEW)
                             + jiraTicketRepository.countByStatus(TicketStatus.BLOCKED);
         long blockedTickets = jiraTicketRepository.countByStatus(TicketStatus.BLOCKED);
-        long closedTickets  = jiraTicketRepository.countByStatus(TicketStatus.DONE);
+        long closedTickets  = jiraTicketRepository.countByStatusAndLastSyncedAtGreaterThanEqual(
+                TicketStatus.DONE,
+                window.startDate().atStartOfDay()
+        );
 
         List<DashboardResponse.AlertItem> alerts = buildAlerts(devBandwidths, overloaded);
 

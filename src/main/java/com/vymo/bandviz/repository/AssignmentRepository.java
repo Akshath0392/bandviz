@@ -14,6 +14,19 @@ public interface AssignmentRepository extends JpaRepository<Assignment, Long> {
 
     List<Assignment> findAllByProjectId(Long projectId);
 
+    @Query("""
+        SELECT a FROM Assignment a
+        JOIN FETCH a.developer
+        JOIN FETCH a.project
+        WHERE a.developer.id = :developerId
+          AND a.startDate <= :endDate
+          AND (a.endDate IS NULL OR a.endDate >= :startDate)
+        """)
+    List<Assignment> findAllOverlappingForDeveloper(
+            @Param("developerId") Long developerId,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate);
+
     // Active assignments for a developer on a given date
     @Query("""
         SELECT a FROM Assignment a
@@ -25,14 +38,16 @@ public interface AssignmentRepository extends JpaRepository<Assignment, Long> {
             @Param("developerId") Long developerId,
             @Param("date") LocalDate date);
 
-    // All active assignments across all developers on a given date
+    // All active assignments across all developers overlapping the supplied period.
     @Query("""
         SELECT a FROM Assignment a
         JOIN FETCH a.developer
         JOIN FETCH a.project
-        WHERE a.startDate <= :date
-          AND (a.endDate IS NULL OR a.endDate >= :date)
+        WHERE a.startDate <= :endDate
+          AND (a.endDate IS NULL OR a.endDate >= :startDate)
           AND a.developer.active = true
         """)
-    List<Assignment> findAllActiveOnDate(@Param("date") LocalDate date);
+    List<Assignment> findAllActiveInRange(
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate);
 }

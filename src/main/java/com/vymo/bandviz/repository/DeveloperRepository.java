@@ -10,9 +10,15 @@ public interface DeveloperRepository extends JpaRepository<Developer, Long> {
 
     List<Developer> findAllByActiveTrue();
 
+    List<Developer> findAllByActiveTrueAndTeamId(Long teamId);
+
+    List<Developer> findAllByTeamId(Long teamId);
+
     Optional<Developer> findByEmail(String email);
 
     Optional<Developer> findByJiraUsername(String jiraUsername);
 
     boolean existsByEmail(String email);
+
+    boolean existsByEmailAndIdNot(String email, Long id);
 }

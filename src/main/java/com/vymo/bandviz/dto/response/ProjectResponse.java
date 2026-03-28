@@ -11,5 +11,7 @@ public class ProjectResponse {
     private String color;
     private Integer targetUtilizationPct;
     private ProjectDeliveryMode deliveryMode;
+    private Long teamId;
+    private String teamName;
     private Boolean active;
 }

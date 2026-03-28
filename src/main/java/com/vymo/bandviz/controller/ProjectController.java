@@ -22,8 +22,9 @@ public class ProjectController {
 
     @GetMapping
     @Operation(summary = "List all projects")
-    public List<ProjectResponse> findAll(@RequestParam(defaultValue = "true") boolean activeOnly) {
-        return projectService.findAll(activeOnly);
+    public List<ProjectResponse> findAll(@RequestParam(defaultValue = "true") boolean activeOnly,
+                                         @RequestParam(required = false) Long teamId) {
+        return projectService.findAll(activeOnly, teamId);
     }
 
     @GetMapping("/{id}")

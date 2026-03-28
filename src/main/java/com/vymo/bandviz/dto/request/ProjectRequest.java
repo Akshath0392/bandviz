@@ -18,4 +18,6 @@ public class ProjectRequest {
     private Integer targetUtilizationPct = 70;
 
     private ProjectDeliveryMode deliveryMode = ProjectDeliveryMode.HYBRID;
+
+    private Long teamId;
 }

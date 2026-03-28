@@ -14,7 +14,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.DayOfWeek;
 import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -78,26 +81,39 @@ public class LeaveService {
     // Count approved working days on leave for a developer in a date range
     public long countApprovedLeaveDays(Long developerId, LocalDate startDate, LocalDate endDate) {
         List<Leave> leaves = leaveRepository.findApprovedLeavesInRange(developerId, startDate, endDate);
-        long totalLeaveDays = leaves.stream()
-                .mapToLong(l -> countWorkingDays(
-                        l.getStartDate().isBefore(startDate) ? startDate : l.getStartDate(),
-                        l.getEndDate().isAfter(endDate) ? endDate : l.getEndDate()))
-                .sum();
-        return Math.min(totalLeaveDays, countWorkingDays(startDate, endDate));
+        Set<LocalDate> leaveDays = new HashSet<>();
+        leaves.forEach(leave -> {
+            LocalDate overlapStart = leave.getStartDate().isBefore(startDate) ? startDate : leave.getStartDate();
+            LocalDate overlapEnd = leave.getEndDate().isAfter(endDate) ? endDate : leave.getEndDate();
+            LocalDate cursor = overlapStart;
+            while (!cursor.isAfter(overlapEnd)) {
+                DayOfWeek dayOfWeek = cursor.getDayOfWeek();
+                if (dayOfWeek != DayOfWeek.SATURDAY && dayOfWeek != DayOfWeek.SUNDAY) {
+                    leaveDays.add(cursor);
+                }
+                cursor = cursor.plusDays(1);
+            }
+        });
+        return leaveDays.size();
     }
 
     // Count working days (Mon–Fri) between two dates, inclusive
     public long countWorkingDays(LocalDate start, LocalDate end) {
-        long count = 0;
-        LocalDate date = start;
-        while (!date.isAfter(end)) {
-            DayOfWeek dow = date.getDayOfWeek();
-            if (dow != DayOfWeek.SATURDAY && dow != DayOfWeek.SUNDAY) {
-                count++;
-            }
-            date = date.plusDays(1);
+        if (end.isBefore(start)) {
+            return 0;
         }
-        return count;
+        long totalDays = ChronoUnit.DAYS.between(start, end) + 1;
+        long fullWeeks = totalDays / 7;
+        long workingDays = fullWeeks * 5;
+        long remainingDays = totalDays % 7;
+
+        for (long i = 0; i < remainingDays; i++) {
+            DayOfWeek dayOfWeek = start.plusDays(fullWeeks * 7 + i).getDayOfWeek();
+            if (dayOfWeek != DayOfWeek.SATURDAY && dayOfWeek != DayOfWeek.SUNDAY) {
+                workingDays++;
+            }
+        }
+        return workingDays;
     }
 
     private LeaveResponse toResponse(Leave l) {

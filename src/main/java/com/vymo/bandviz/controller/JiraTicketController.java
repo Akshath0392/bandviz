@@ -21,8 +21,10 @@ public class JiraTicketController {
     private final JiraTicketService jiraTicketService;
 
     @GetMapping
-    @Operation(summary = "List Jira tickets for a developer")
-    public List<JiraTicketResponse> findByDeveloper(@RequestParam Long developerId) {
-        return jiraTicketService.findByDeveloper(developerId);
+    @Operation(summary = "List Jira tickets using developer, team, or project mapping")
+    public List<JiraTicketResponse> findTickets(@RequestParam(required = false) Long developerId,
+                                                @RequestParam(required = false) Long teamId,
+                                                @RequestParam(required = false) Long projectId) {
+        return jiraTicketService.findTickets(developerId, teamId, projectId);
     }
 }

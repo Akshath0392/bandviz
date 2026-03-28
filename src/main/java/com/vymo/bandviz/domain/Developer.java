@@ -40,6 +40,10 @@ public class Developer {
     @Builder.Default
     private Boolean active = true;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "team_id")
+    private Team team;
+
     @OneToMany(mappedBy = "developer", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<Assignment> assignments = new ArrayList<>();

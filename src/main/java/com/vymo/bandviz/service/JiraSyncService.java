@@ -18,8 +18,10 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -31,8 +33,8 @@ public class JiraSyncService {
     private final ProjectRepository projectRepository;
     private final JiraProperties jiraProperties;
 
-    private LocalDateTime lastSyncedAt;
-    private String lastSyncStatus = "Never synced";
+    private volatile LocalDateTime lastSyncedAt;
+    private volatile String lastSyncStatus = "Never synced";
 
     @Transactional
     @Scheduled(fixedDelayString = "${bandviz.jira.sync-interval-ms:900000}") // default 15 min
@@ -92,6 +94,8 @@ public class JiraSyncService {
         String nextPageToken = null;
         int totalSynced = 0;
         int page = 1;
+        LocalDateTime syncTime = LocalDateTime.now();
+        Set<String> seenTicketKeys = new HashSet<>();
 
         while (true) {
             JiraSearchResponse response = jiraClient.fetchOpenIssues(projectKey, nextPageToken);
@@ -103,7 +107,8 @@ public class JiraSyncService {
             log.info("Processing {} Jira issues for project {} on page {}", response.getIssues().size(), projectKey, page);
 
             for (JiraIssueResponse issue : response.getIssues()) {
-                upsertTicket(issue, projectKey);
+                upsertTicket(issue, projectKey, syncTime);
+                seenTicketKeys.add(issue.getKey());
                 totalSynced++;
             }
 
@@ -114,16 +119,18 @@ public class JiraSyncService {
             nextPageToken = response.getNextPageToken();
             page++;
         }
+
+        markResolvedTickets(projectKey, seenTicketKeys, syncTime);
         return totalSynced;
     }
 
-    private void upsertTicket(JiraIssueResponse issue, String projectKey) {
+    private void upsertTicket(JiraIssueResponse issue, String projectKey, LocalDateTime syncTime) {
         Optional<JiraTicket> existing = jiraTicketRepository.findByTicketKey(issue.getKey());
         JiraTicket ticket = existing.orElse(new JiraTicket());
 
         ticket.setTicketKey(issue.getKey());
         ticket.setProjectKey(projectKey);
-        ticket.setLastSyncedAt(LocalDateTime.now());
+        ticket.setLastSyncedAt(syncTime);
 
         if (issue.getFields() != null) {
             ticket.setSummary(issue.getFields().getSummary());
@@ -147,6 +154,18 @@ public class JiraSyncService {
         }
 
         jiraTicketRepository.save(ticket);
+    }
+
+    private void markResolvedTickets(String projectKey, Set<String> seenTicketKeys, LocalDateTime syncTime) {
+        jiraTicketRepository.findAllByProjectKey(projectKey).stream()
+                .filter(ticket -> ticket.getStatus() != TicketStatus.DONE)
+                .filter(ticket -> !seenTicketKeys.contains(ticket.getTicketKey()))
+                .forEach(ticket -> {
+                    ticket.setStatus(TicketStatus.DONE);
+                    ticket.setRawStatus("Done");
+                    ticket.setLastSyncedAt(syncTime);
+                    jiraTicketRepository.save(ticket);
+                });
     }
 
     public SyncStatusResponse getStatus() {
