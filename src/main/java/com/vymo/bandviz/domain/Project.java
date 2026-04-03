@@ -5,7 +5,9 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 @Entity
 @Table(name = "projects")
@@ -44,8 +46,17 @@ public class Project {
     private Boolean active = true;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "team_id")
+    @JoinColumn(name = "team_id", nullable = false)
     private Team team;
+
+    @ManyToMany
+    @JoinTable(
+            name = "project_team_permissions",
+            joinColumns = @JoinColumn(name = "project_id"),
+            inverseJoinColumns = @JoinColumn(name = "team_id")
+    )
+    @Builder.Default
+    private Set<Team> permittedTeams = new LinkedHashSet<>();
 
     @OneToMany(mappedBy = "project", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default

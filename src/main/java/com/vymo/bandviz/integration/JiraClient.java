@@ -26,14 +26,15 @@ public class JiraClient {
 
     private static final int PAGE_SIZE = 100;
 
-    public JiraSearchResponse fetchOpenIssues(String projectKey, String nextPageToken) {
+    public JiraSearchResponse fetchOpenIssues(String projectKey, String jql, String nextPageToken) {
         String safeProjectKey = sanitizeProjectKey(projectKey);
-        String jql = String.format(
-                "project = \"%s\" AND statusCategory != Done ORDER BY updated DESC", safeProjectKey);
+        String safeJql = jql == null || jql.isBlank()
+                ? String.format("project = \"%s\" AND statusCategory != Done ORDER BY updated DESC", safeProjectKey)
+                : jql;
 
         UriComponentsBuilder builder = UriComponentsBuilder
                 .fromHttpUrl(jiraProperties.getBaseUrl() + "/rest/api/3/search/jql")
-                .queryParam("jql", jql)
+                .queryParam("jql", safeJql)
                 .queryParam("maxResults", PAGE_SIZE)
                 .queryParam(
                         "fields",
@@ -46,7 +47,7 @@ public class JiraClient {
 
         URI uri = builder.build().encode().toUri();
 
-        log.info("Fetching Jira issues for project {} using enhanced search API. JQL: {}", safeProjectKey, jql);
+        log.info("Fetching Jira issues for project {} using enhanced search API. JQL: {}", safeProjectKey, safeJql);
         log.debug("Calling Jira endpoint {} with nextPageToken={}", uri, nextPageToken);
 
         try {

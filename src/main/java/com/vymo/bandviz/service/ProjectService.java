@@ -13,6 +13,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.LinkedHashSet;
+import java.util.Set;
+import java.util.Comparator;
 
 @Service
 @RequiredArgsConstructor
@@ -26,8 +29,8 @@ public class ProjectService {
         List<Project> projects;
         if (teamId != null) {
             projects = activeOnly
-                    ? projectRepository.findAllByActiveTrueAndTeamId(teamId)
-                    : projectRepository.findAllByTeamId(teamId);
+                    ? projectRepository.findDistinctByActiveTrueAndPermittedTeams_Id(teamId)
+                    : projectRepository.findDistinctByPermittedTeams_Id(teamId);
         } else {
             projects = activeOnly
                     ? projectRepository.findAllByActiveTrue()
@@ -51,9 +54,10 @@ public class ProjectService {
                 .color(request.getColor())
                 .targetUtilizationPct(request.getTargetUtilizationPct())
                 .deliveryMode(request.getDeliveryMode())
-                .team(resolveTeam(request.getTeamId()))
+                .team(resolvePrimaryTeam(request.getTeamId()))
                 .active(true)
                 .build();
+        project.setPermittedTeams(resolvePermittedTeams(request.getPermittedTeamIds(), project.getTeam()));
         return toResponse(projectRepository.save(project));
     }
 
@@ -65,7 +69,9 @@ public class ProjectService {
         project.setColor(request.getColor());
         project.setTargetUtilizationPct(request.getTargetUtilizationPct());
         project.setDeliveryMode(request.getDeliveryMode());
-        project.setTeam(resolveTeam(request.getTeamId()));
+        Team primaryTeam = resolvePrimaryTeam(request.getTeamId());
+        project.setTeam(primaryTeam);
+        project.setPermittedTeams(resolvePermittedTeams(request.getPermittedTeamIds(), primaryTeam));
         return toResponse(projectRepository.save(project));
     }
 
@@ -91,15 +97,42 @@ public class ProjectService {
         r.setDeliveryMode(p.getDeliveryMode());
         r.setTeamId(p.getTeam() != null ? p.getTeam().getId() : null);
         r.setTeamName(p.getTeam() != null ? p.getTeam().getName() : null);
+        List<Team> permitted = p.getPermittedTeams() == null
+                ? List.of()
+                : p.getPermittedTeams().stream()
+                    .sorted(Comparator.comparing(Team::getId))
+                    .toList();
+        r.setPermittedTeamIds(permitted.stream().map(Team::getId).toList());
+        r.setPermittedTeamNames(permitted.stream().map(Team::getName).toList());
         r.setActive(p.getActive());
         return r;
     }
 
-    private Team resolveTeam(Long teamId) {
+    private Team resolvePrimaryTeam(Long teamId) {
         if (teamId == null) {
-            return null;
+            throw new BusinessException("teamId is required for projects");
         }
         return teamRepository.findById(teamId)
                 .orElseThrow(() -> new ResourceNotFoundException("Team not found: " + teamId));
+    }
+
+    private Set<Team> resolvePermittedTeams(List<Long> permittedTeamIds, Team primaryTeam) {
+        if (primaryTeam == null) {
+            throw new BusinessException("teamId is required for projects");
+        }
+
+        if (permittedTeamIds == null || permittedTeamIds.isEmpty()) {
+            return new LinkedHashSet<>(Set.of(primaryTeam));
+        }
+
+        LinkedHashSet<Long> requestedIds = new LinkedHashSet<>();
+        permittedTeamIds.stream().filter(id -> id != null).forEach(requestedIds::add);
+        requestedIds.add(primaryTeam.getId());
+
+        List<Team> resolvedTeams = teamRepository.findAllById(requestedIds);
+        if (resolvedTeams.size() != requestedIds.size()) {
+            throw new ResourceNotFoundException("One or more permitted teams were not found");
+        }
+        return new LinkedHashSet<>(resolvedTeams);
     }
 }

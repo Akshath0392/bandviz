@@ -75,7 +75,7 @@ class JiraTicketServiceTest {
                 .build();
 
         when(teamRepository.findById(4L)).thenReturn(Optional.of(team));
-        when(projectRepository.findAllByActiveTrueAndTeamId(4L)).thenReturn(List.of(project));
+        when(projectRepository.findDistinctByActiveTrueAndPermittedTeams_Id(4L)).thenReturn(List.of(project));
         when(developerRepository.findAllByActiveTrueAndTeamId(4L)).thenReturn(List.of(developer));
         when(jiraTicketRepository.findAllByProjectKeyIn(List.of("FICC"))).thenReturn(List.of(projectTicket));
         when(jiraTicketRepository.findAllByAssigneeJiraUsernameIn(List.of("tejas@getvymo.com"))).thenReturn(List.of(developerTicket));

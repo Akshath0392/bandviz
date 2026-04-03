@@ -10,9 +10,11 @@ public interface ProjectRepository extends JpaRepository<Project, Long> {
 
     List<Project> findAllByActiveTrue();
 
-    List<Project> findAllByActiveTrueAndTeamId(Long teamId);
+    List<Project> findDistinctByActiveTrueAndPermittedTeams_Id(Long teamId);
 
-    List<Project> findAllByTeamId(Long teamId);
+    List<Project> findDistinctByPermittedTeams_Id(Long teamId);
+
+    long countByActiveTrueAndPermittedTeams_Id(Long teamId);
 
     Optional<Project> findByJiraProjectKey(String jiraProjectKey);
 

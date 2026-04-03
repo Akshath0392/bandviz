@@ -100,7 +100,7 @@ public class DeveloperService {
 
     private Team resolveTeam(Long teamId) {
         if (teamId == null) {
-            return null;
+            throw new BusinessException("teamId is required for developers");
         }
         return teamRepository.findById(teamId)
                 .orElseThrow(() -> new ResourceNotFoundException("Team not found: " + teamId));

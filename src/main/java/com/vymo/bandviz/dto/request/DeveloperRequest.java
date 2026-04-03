@@ -23,5 +23,6 @@ public class DeveloperRequest {
 
     private String jiraUsername;
 
+    @NotNull
     private Long teamId;
 }

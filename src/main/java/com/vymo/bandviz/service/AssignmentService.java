@@ -43,6 +43,7 @@ public class AssignmentService {
         }
         Developer developer = developerService.getOrThrow(request.getDeveloperId());
         Project project = projectService.getOrThrow(request.getProjectId());
+        validateTeamAlignment(developer, project);
         validateAllocationCap(developer.getId(), request.getAllocationPct(), request.getStartDate(), request.getEndDate(), null);
 
         Assignment assignment = Assignment.builder()
@@ -120,6 +121,16 @@ public class AssignmentService {
     private boolean isActiveOnDate(Assignment assignment, LocalDate date) {
         return !assignment.getStartDate().isAfter(date)
                 && (assignment.getEndDate() == null || !assignment.getEndDate().isBefore(date));
+    }
+
+    private void validateTeamAlignment(Developer developer, Project project) {
+        Long developerTeamId = developer.getTeam() != null ? developer.getTeam().getId() : null;
+        boolean teamAllowed = project.getPermittedTeams() != null
+                && developerTeamId != null
+                && project.getPermittedTeams().stream().anyMatch(team -> developerTeamId.equals(team.getId()));
+        if (!teamAllowed) {
+            throw new BusinessException("Developer team is not permitted for the selected project");
+        }
     }
 
     private AssignmentResponse toResponse(Assignment a) {

@@ -1,6 +1,7 @@
 package com.vymo.bandviz.controller;
 
 import com.vymo.bandviz.dto.request.TeamRequest;
+import com.vymo.bandviz.dto.response.JiraLinkedTeamResponse;
 import com.vymo.bandviz.dto.response.TeamResponse;
 import com.vymo.bandviz.service.TeamService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -24,6 +25,12 @@ public class TeamController {
     @Operation(summary = "List all teams")
     public List<TeamResponse> findAll(@RequestParam(defaultValue = "true") boolean activeOnly) {
         return teamService.findAll(activeOnly);
+    }
+
+    @GetMapping("/jira-linked")
+    @Operation(summary = "List active teams that have Jira-linked projects")
+    public List<JiraLinkedTeamResponse> jiraLinked() {
+        return teamService.findJiraLinkedTeams();
     }
 
     @GetMapping("/{id}")

@@ -2,9 +2,12 @@ package com.vymo.bandviz.service;
 
 import com.vymo.bandviz.domain.Team;
 import com.vymo.bandviz.dto.request.TeamRequest;
+import com.vymo.bandviz.dto.response.JiraLinkedTeamResponse;
 import com.vymo.bandviz.dto.response.TeamResponse;
 import com.vymo.bandviz.exception.BusinessException;
 import com.vymo.bandviz.exception.ResourceNotFoundException;
+import com.vymo.bandviz.repository.DeveloperRepository;
+import com.vymo.bandviz.repository.ProjectRepository;
 import com.vymo.bandviz.repository.TeamRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -18,6 +21,8 @@ import java.util.List;
 public class TeamService {
 
     private final TeamRepository teamRepository;
+    private final ProjectRepository projectRepository;
+    private final DeveloperRepository developerRepository;
 
     public List<TeamResponse> findAll(boolean activeOnly) {
         List<Team> teams = activeOnly ? teamRepository.findAllByActiveTrue() : teamRepository.findAll();
@@ -26,6 +31,32 @@ public class TeamService {
 
     public TeamResponse findById(Long id) {
         return toResponse(getOrThrow(id));
+    }
+
+    public List<JiraLinkedTeamResponse> findJiraLinkedTeams() {
+        return teamRepository.findAllByActiveTrue().stream()
+                .map(team -> {
+                    List<JiraLinkedTeamResponse.ProjectLink> links = projectRepository.findDistinctByActiveTrueAndPermittedTeams_Id(team.getId()).stream()
+                            .filter(project -> project.getJiraProjectKey() != null && !project.getJiraProjectKey().isBlank())
+                            .map(project -> {
+                                JiraLinkedTeamResponse.ProjectLink link = new JiraLinkedTeamResponse.ProjectLink();
+                                link.setProjectId(project.getId());
+                                link.setProjectName(project.getName());
+                                link.setJiraProjectKey(project.getJiraProjectKey());
+                                return link;
+                            })
+                            .toList();
+                    if (links.isEmpty()) {
+                        return null;
+                    }
+                    JiraLinkedTeamResponse response = new JiraLinkedTeamResponse();
+                    response.setTeamId(team.getId());
+                    response.setTeamName(team.getName());
+                    response.setProjects(links);
+                    return response;
+                })
+                .filter(item -> item != null)
+                .toList();
     }
 
     @Transactional
@@ -70,8 +101,8 @@ public class TeamService {
         response.setName(team.getName());
         response.setDescription(team.getDescription());
         response.setActive(team.getActive());
-        response.setProjectCount((int) team.getProjects().stream().filter(project -> Boolean.TRUE.equals(project.getActive())).count());
-        response.setDeveloperCount((int) team.getDevelopers().stream().filter(developer -> Boolean.TRUE.equals(developer.getActive())).count());
+        response.setProjectCount((int) projectRepository.countByActiveTrueAndPermittedTeams_Id(team.getId()));
+        response.setDeveloperCount((int) developerRepository.countByActiveTrueAndTeamId(team.getId()));
         return response;
     }
 }

@@ -14,6 +14,8 @@ public interface DeveloperRepository extends JpaRepository<Developer, Long> {
 
     List<Developer> findAllByTeamId(Long teamId);
 
+    long countByActiveTrueAndTeamId(Long teamId);
+
     Optional<Developer> findByEmail(String email);
 
     Optional<Developer> findByJiraUsername(String jiraUsername);

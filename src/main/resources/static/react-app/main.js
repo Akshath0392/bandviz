@@ -159,6 +159,15 @@ function clamp(value, min = 0, max = 100) {
   return Math.min(max, Math.max(min, value));
 }
 
+function projectPermitsTeam(project, teamId) {
+  if (!project || !teamId) return false;
+  const permittedIds = Array.isArray(project.permittedTeamIds) ? project.permittedTeamIds : [];
+  if (permittedIds.length) {
+    return permittedIds.some((id) => String(id) === String(teamId));
+  }
+  return String(project.teamId) === String(teamId);
+}
+
 function formatRelativeTime(value) {
   if (!value) return "Never";
   const date = new Date(value);
@@ -1565,24 +1574,30 @@ function LeavesPage() {
 function PlannerPage() {
   const [rows, setRows] = useState([]);
   const [projects, setProjects] = useState([]);
+  const [developers, setDevelopers] = useState([]);
   const [dashboard, setDashboard] = useState(null);
   const [banner, setBanner] = useState(null);
   const [error, setError] = useState("");
-  const [formDefaults, setFormDefaults] = useState({ developerId: "", projectId: "" });
+  const [formState, setFormState] = useState({ developerId: "", projectId: "" });
 
   async function loadBase() {
     try {
-      const [capacityRows, projectRows, dashboardRow] = await Promise.all([
+      const [capacityRows, projectRows, developerRows, dashboardRow] = await Promise.all([
         api("/api/capacity"),
         api("/api/projects"),
+        api("/api/developers"),
         api("/api/dashboard-summary").catch(() => null)
       ]);
       setRows(capacityRows);
       setProjects(projectRows);
+      setDevelopers(developerRows);
       setDashboard(dashboardRow);
-      setFormDefaults({
-        developerId: String(capacityRows[0]?.developerId || ""),
-        projectId: String(projectRows[0]?.id || "")
+      const defaultDeveloperId = String(capacityRows[0]?.developerId || developerRows[0]?.id || "");
+      const defaultDeveloper = developerRows.find((dev) => String(dev.id) === defaultDeveloperId);
+      const teamProjects = projectRows.filter((project) => projectPermitsTeam(project, defaultDeveloper?.teamId));
+      setFormState({
+        developerId: defaultDeveloperId,
+        projectId: String(teamProjects[0]?.id || projectRows[0]?.id || "")
       });
       setBanner({
         message: capacityRows.length && projectRows.length
@@ -1616,10 +1631,7 @@ function PlannerPage() {
         })
       });
       event.currentTarget.reset();
-      setFormDefaults((current) => ({
-        developerId: current.developerId || String(rows[0]?.developerId || ""),
-        projectId: current.projectId || String(projects[0]?.id || "")
-      }));
+      setFormState((current) => ({ ...current }));
       setBanner({ message: "Allocation created successfully.", tone: "info" });
       await loadBase();
     } catch (createError) {
@@ -1658,6 +1670,13 @@ function PlannerPage() {
     alerts.push(`${row.developerName} still has ${100 - (row.totalAllocationPct ?? 0)}% free capacity for spillover work.`);
   });
   const matrixRows = rows;
+  const selectedDeveloper = developers.find((dev) => String(dev.id) === String(formState.developerId));
+  const teamScopedProjects = selectedDeveloper?.teamId
+    ? projects.filter((project) => projectPermitsTeam(project, selectedDeveloper.teamId))
+    : projects;
+  const effectiveProjectId = formState.projectId && teamScopedProjects.some((project) => String(project.id) === String(formState.projectId))
+    ? formState.projectId
+    : String(teamScopedProjects[0]?.id || "");
   const projectTotalRow = visibleProjects.map((project) => projectTotals.get(project.name) || 0);
 
   function exportPlannerCsv() {
@@ -1811,7 +1830,23 @@ function PlannerPage() {
               <form className="stack" onSubmit=${createAllocation}>
                 <div>
                   <label for="developerId">Developer</label>
-                  <select id="developerId" name="developerId" defaultValue=${formDefaults.developerId} required>
+                  <select
+                    id="developerId"
+                    name="developerId"
+                    value=${formState.developerId}
+                    onChange=${(event) => {
+                      const nextDeveloperId = event.target.value;
+                      const nextDeveloper = developers.find((dev) => String(dev.id) === String(nextDeveloperId));
+                      const nextProjects = nextDeveloper?.teamId
+                        ? projects.filter((project) => projectPermitsTeam(project, nextDeveloper.teamId))
+                        : projects;
+                      setFormState({
+                        developerId: nextDeveloperId,
+                        projectId: String(nextProjects[0]?.id || "")
+                      });
+                    }}
+                    required
+                  >
                     ${rows.length
                       ? rows.map((row) => html`<option key=${row.developerId} value=${row.developerId}>${row.developerName}</option>`)
                       : html`<option value="">No developers available</option>`}
@@ -1819,11 +1854,20 @@ function PlannerPage() {
                 </div>
                 <div>
                   <label for="projectId">Project</label>
-                  <select id="projectId" name="projectId" defaultValue=${formDefaults.projectId} required>
-                    ${projects.length
-                      ? projects.map((project) => html`<option key=${project.id} value=${project.id}>${project.name} (${humanize(project.deliveryMode || "HYBRID")})</option>`)
+                  <select
+                    id="projectId"
+                    name="projectId"
+                    value=${effectiveProjectId}
+                    onChange=${(event) => setFormState((current) => ({ ...current, projectId: event.target.value }))}
+                    required
+                  >
+                    ${teamScopedProjects.length
+                      ? teamScopedProjects.map((project) => html`<option key=${project.id} value=${project.id}>${project.name} (${humanize(project.deliveryMode || "HYBRID")})</option>`)
                       : html`<option value="">No projects available</option>`}
                   </select>
+                  <div className="settings-subtle" style=${{ marginTop: "4px" }}>
+                    ${selectedDeveloper?.teamName ? `Team-scoped to ${selectedDeveloper.teamName}` : "Select a developer to scope projects by team"}
+                  </div>
                 </div>
                 <div className="row">
                   <div>
@@ -1852,6 +1896,94 @@ function PlannerPage() {
 }
 
 function JiraPage() {
+  const issueTypeOptions = ["Bug", "Story", "Task", "Epic", "Sub-task"];
+  const defaultFilter = () => ({
+    assignees: [],
+    labels: [],
+    sprintMode: "all",
+    statusCategory: "not-done",
+    components: [],
+    issueTypes: [],
+    priorityMode: "all",
+    createdAfter: null,
+    customJql: ""
+  });
+  const normalizeFilter = (filter) => {
+    const row = filter || {};
+    return {
+      assignees: Array.isArray(row.assignees) ? row.assignees : [],
+      labels: Array.isArray(row.labels) ? row.labels : [],
+      sprintMode: row.sprintMode || "all",
+      statusCategory: row.statusCategory || "not-done",
+      components: Array.isArray(row.components) ? row.components : [],
+      issueTypes: Array.isArray(row.issueTypes) ? row.issueTypes : [],
+      priorityMode: row.priorityMode || "all",
+      createdAfter: row.createdAfter || null,
+      customJql: row.customJql || ""
+    };
+  };
+  const parseTagValues = (value) => String(value || "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+  const withUnique = (values) => [...new Set((values || []).map((item) => String(item || "").trim()).filter(Boolean))];
+  const activeFilterCount = (filter) => {
+    const safe = normalizeFilter(filter);
+    let count = 0;
+    if (safe.assignees.length) count += 1;
+    if (safe.labels.length) count += 1;
+    if (safe.components.length) count += 1;
+    if (safe.issueTypes.length) count += 1;
+    if (safe.createdAfter) count += 1;
+    if (safe.customJql) count += 1;
+    if (safe.sprintMode !== "all") count += 1;
+    if (safe.priorityMode !== "all") count += 1;
+    if (safe.statusCategory !== "not-done") count += 1;
+    return count;
+  };
+  const addInClause = (parts, field, values) => {
+    if (!values?.length) return;
+    const joined = values.map((value) => `"${String(value).replaceAll("\"", "\\\"")}"`).join(", ");
+    parts.push(`${field} IN (${joined})`);
+  };
+  const buildPreviewJql = (projectKey, filter) => {
+    const safe = normalizeFilter(filter);
+    const safeProjectKey = String(projectKey || "").trim().replaceAll("\"", "\\\"");
+    if (!safeProjectKey) return "Select a Jira project key to preview generated JQL";
+    if (safe.customJql) return `project = "${safeProjectKey}" AND (${safe.customJql}) ORDER BY updated DESC`;
+    const parts = [`project = "${safeProjectKey}"`];
+    if (safe.statusCategory === "to-do") {
+      parts.push('statusCategory = "To Do"');
+    } else if (safe.statusCategory === "in-progress") {
+      parts.push('statusCategory = "In Progress"');
+    } else if (safe.statusCategory !== "all") {
+      parts.push("statusCategory != Done");
+    }
+    addInClause(parts, "assignee", safe.assignees);
+    addInClause(parts, "labels", safe.labels);
+    addInClause(parts, "component", safe.components);
+    addInClause(parts, "issuetype", safe.issueTypes);
+    if (safe.sprintMode === "active") parts.push("sprint IN openSprints()");
+    if (safe.sprintMode === "backlog") parts.push("sprint IS EMPTY");
+    if (safe.sprintMode !== "all" && safe.sprintMode !== "active" && safe.sprintMode !== "backlog") parts.push(`sprint = "${safe.sprintMode.replaceAll("\"", "\\\"")}"`);
+    if (safe.priorityMode === "highest") parts.push("priority = Highest");
+    if (safe.priorityMode === "high-up") parts.push("priority IN (Highest, High)");
+    if (safe.priorityMode === "medium-up") parts.push("priority IN (Highest, High, Medium)");
+    if (safe.createdAfter) parts.push(`created >= "${safe.createdAfter}"`);
+    return `${parts.join(" AND ")} ORDER BY updated DESC`;
+  };
+  const mergeFilter = (globalFilter, projectFilter) => ({
+    assignees: withUnique([...(globalFilter.assignees || []), ...(projectFilter.assignees || [])]),
+    labels: withUnique([...(globalFilter.labels || []), ...(projectFilter.labels || [])]),
+    sprintMode: projectFilter.sprintMode || globalFilter.sprintMode || "all",
+    statusCategory: projectFilter.statusCategory || globalFilter.statusCategory || "not-done",
+    components: withUnique([...(globalFilter.components || []), ...(projectFilter.components || [])]),
+    issueTypes: withUnique([...(globalFilter.issueTypes || []), ...(projectFilter.issueTypes || [])]),
+    priorityMode: projectFilter.priorityMode || globalFilter.priorityMode || "all",
+    createdAfter: projectFilter.createdAfter || globalFilter.createdAfter || null,
+    customJql: projectFilter.customJql || globalFilter.customJql || ""
+  });
+
   const [status, setStatus] = useState(null);
   const [projectMappings, setProjectMappings] = useState([]);
   const [dashboard, setDashboard] = useState(null);
@@ -1859,19 +1991,43 @@ function JiraPage() {
   const [banner, setBanner] = useState(null);
   const [error, setError] = useState("");
   const [running, setRunning] = useState(false);
+  const [savingFilters, setSavingFilters] = useState(false);
+  const [scope, setScope] = useState("GLOBAL");
+  const [filtersModel, setFiltersModel] = useState({ globalFilter: defaultFilter(), projectOverrides: [] });
+  const [selectedProjectKey, setSelectedProjectKey] = useState("");
+  const [editorFilter, setEditorFilter] = useState(defaultFilter());
+  const [tagDrafts, setTagDrafts] = useState({ assignees: "", labels: "", components: "" });
 
   async function load() {
     try {
-      const [nextStatus, mappings, dashboardRow, capacity] = await Promise.all([
+      const [nextStatus, mappings, dashboardRow, capacity, filterConfig] = await Promise.all([
         api("/api/jira-sync/status"),
         api("/api/jira-sync/projects").catch(() => []),
         api("/api/dashboard-summary").catch(() => null),
-        api("/api/capacity").catch(() => [])
+        api("/api/capacity").catch(() => []),
+        api("/api/jira-sync/filters").catch(() => ({ globalFilter: defaultFilter(), projectOverrides: [] }))
       ]);
+      const normalizedModel = {
+        globalFilter: normalizeFilter(filterConfig?.globalFilter),
+        projectOverrides: (filterConfig?.projectOverrides || []).map((item) => ({
+          ...item,
+          filter: normalizeFilter(item.filter)
+        }))
+      };
+      const fallbackProjectKey = normalizedModel.projectOverrides[0]?.jiraProjectKey || mappings[0]?.jiraProjectKey || "";
       setStatus(nextStatus);
       setProjectMappings(mappings);
       setDashboard(dashboardRow);
       setCapacityRows(capacity);
+      setFiltersModel(normalizedModel);
+      setSelectedProjectKey((current) => current || fallbackProjectKey);
+      setEditorFilter((current) => {
+        if (scope === "PROJECT") {
+          const projectRow = normalizedModel.projectOverrides.find((item) => item.jiraProjectKey === (selectedProjectKey || fallbackProjectKey));
+          return normalizeFilter(projectRow?.filter);
+        }
+        return current && activeFilterCount(current) ? current : normalizeFilter(normalizedModel.globalFilter);
+      });
       setBanner({
         message: nextStatus.syncEnabled
           ? "Jira integration is configured. You can trigger a sync manually at any time."
@@ -1903,6 +2059,71 @@ function JiraPage() {
     }
   }
 
+  const setFilterField = (field, value) => {
+    setEditorFilter((current) => ({ ...current, [field]: value }));
+  };
+
+  const addTagListValues = (field) => {
+    const parsed = parseTagValues(tagDrafts[field]);
+    if (!parsed.length) return;
+    setEditorFilter((current) => ({ ...current, [field]: withUnique([...(current[field] || []), ...parsed]) }));
+    setTagDrafts((current) => ({ ...current, [field]: "" }));
+  };
+
+  const removeTagListValue = (field, value) => {
+    setEditorFilter((current) => ({ ...current, [field]: (current[field] || []).filter((item) => item !== value) }));
+  };
+
+  async function saveFilters() {
+    setSavingFilters(true);
+    try {
+      if (scope === "GLOBAL") {
+        await api("/api/jira-sync/filters/global", {
+          method: "PUT",
+          body: JSON.stringify(editorFilter)
+        });
+      } else {
+        if (!selectedProjectKey) throw new Error("Select a project key for per-project override");
+        await api(`/api/jira-sync/filters/projects/${encodeURIComponent(selectedProjectKey)}`, {
+          method: "PUT",
+          body: JSON.stringify(editorFilter)
+        });
+      }
+      setBanner({ message: scope === "GLOBAL" ? "Global Jira sync filters updated." : `Override saved for ${selectedProjectKey}.`, tone: "info" });
+      await load();
+    } catch (saveError) {
+      setError(`Failed to save filters: ${saveError.message}`);
+      setBanner({ message: `Unable to save filters: ${saveError.message}`, tone: "error" });
+    } finally {
+      setSavingFilters(false);
+    }
+  }
+
+  async function resetFilters() {
+    setSavingFilters(true);
+    try {
+      if (scope === "GLOBAL") {
+        await api("/api/jira-sync/filters/global", { method: "DELETE" });
+      } else {
+        if (!selectedProjectKey) throw new Error("Select a project key for per-project reset");
+        await api(`/api/jira-sync/filters/projects/${encodeURIComponent(selectedProjectKey)}`, { method: "DELETE" });
+      }
+      setBanner({ message: scope === "GLOBAL" ? "Global filters reset to defaults." : `Override reset for ${selectedProjectKey}.`, tone: "info" });
+      await load();
+      setEditorFilter(defaultFilter());
+    } catch (resetError) {
+      setError(`Failed to reset filters: ${resetError.message}`);
+      setBanner({ message: `Unable to reset filters: ${resetError.message}`, tone: "error" });
+    } finally {
+      setSavingFilters(false);
+    }
+  }
+
+  async function applyFiltersAndSync() {
+    await saveFilters();
+    await runSync();
+  }
+
   const blockedTickets = dashboard?.totalBlockedTickets ?? 0;
   const closedTickets = dashboard?.totalClosedInWindow ?? dashboard?.totalClosedThisSprint ?? 0;
   const devsWithTickets = capacityRows.filter((row) => (row.openTickets ?? 0) > 0).length;
@@ -1916,6 +2137,18 @@ function JiraPage() {
     status?.syncEnabled ? `Sync is enabled for ${projectMappings.length} mapped project${projectMappings.length === 1 ? "" : "s"}` : "Sync is currently disabled in server configuration",
     blockedTickets ? `${blockedTickets} blocked Jira ticket${blockedTickets === 1 ? "" : "s"} need attention in the planning window` : null
   ].filter(Boolean);
+  const effectiveFilter = scope === "GLOBAL"
+    ? normalizeFilter(editorFilter)
+    : mergeFilter(normalizeFilter(filtersModel.globalFilter), normalizeFilter(editorFilter));
+  const previewProjectKey = scope === "PROJECT" ? selectedProjectKey : (projectMappings[0]?.jiraProjectKey || selectedProjectKey || "");
+  const previewJql = buildPreviewJql(previewProjectKey, effectiveFilter);
+  const activeSummary = [
+    { label: "Assignees", value: effectiveFilter.assignees.length ? `${effectiveFilter.assignees.length} selected` : "All assignees" },
+    { label: "Labels", value: effectiveFilter.labels.length ? effectiveFilter.labels.join(", ") : "Any label" },
+    { label: "Sprint", value: effectiveFilter.sprintMode === "all" ? "All sprints" : effectiveFilter.sprintMode === "active" ? "Active sprint only" : effectiveFilter.sprintMode === "backlog" ? "Backlog only" : effectiveFilter.sprintMode },
+    { label: "Components", value: effectiveFilter.components.length ? effectiveFilter.components.join(", ") : "Any component" },
+    { label: "Scope", value: scope === "GLOBAL" ? "Global (all projects)" : `Project override (${selectedProjectKey || "Select project"})` }
+  ];
 
   return html`
     <${PageShell}
@@ -1924,7 +2157,7 @@ function JiraPage() {
       actions=${html`
         <span className="muted-inline">Last synced: <strong>${formatRelativeTime(status?.lastSyncedAt)}</strong></span>
         <a className="btn btn-secondary" href="/settings">⚙ Configure</a>
-        <button className="btn btn-primary" onClick=${runSync} disabled=${running}>${running ? "Running..." : "↻ Sync Now"}</button>
+        <button className="btn btn-primary" onClick=${runSync} disabled=${running || savingFilters}>${running ? "Running..." : "↻ Sync Now"}</button>
       `}
       banner=${banner}
     >
@@ -1990,6 +2223,140 @@ function JiraPage() {
             </div>
           </section>
 
+          <section className="card">
+            <div className="card-header">
+              <span className="card-title">Sync Filters <span className="filter-active-count">${activeFilterCount(effectiveFilter)} active</span></span>
+              <div className="jira-filter-head-actions">
+                <div className="jira-filter-scope">
+                  <button
+                    className=${`jira-scope-btn ${scope === "GLOBAL" ? "active" : ""}`}
+                    onClick=${() => {
+                      setScope("GLOBAL");
+                      setEditorFilter(normalizeFilter(filtersModel.globalFilter));
+                    }}
+                  >Global</button>
+                  <button
+                    className=${`jira-scope-btn ${scope === "PROJECT" ? "active" : ""}`}
+                    onClick=${() => {
+                      setScope("PROJECT");
+                      const nextKey = selectedProjectKey || filtersModel.projectOverrides[0]?.jiraProjectKey || "";
+                      setSelectedProjectKey(nextKey);
+                      const row = filtersModel.projectOverrides.find((item) => item.jiraProjectKey === nextKey);
+                      setEditorFilter(normalizeFilter(row?.filter));
+                    }}
+                  >Per-Project</button>
+                </div>
+                <button className="btn btn-secondary jira-filter-reset-btn" onClick=${resetFilters} disabled=${savingFilters || running}>Reset</button>
+              </div>
+            </div>
+            <div className="card-body">
+              ${scope === "PROJECT"
+                ? html`<div className="jira-project-picker">
+                    <label className="jira-filter-label">Project Override</label>
+                    <select
+                      className="jira-filter-input"
+                      value=${selectedProjectKey}
+                      onChange=${(event) => {
+                        const nextKey = event.target.value;
+                        setSelectedProjectKey(nextKey);
+                        const row = filtersModel.projectOverrides.find((item) => item.jiraProjectKey === nextKey);
+                        setEditorFilter(normalizeFilter(row?.filter));
+                      }}
+                    >
+                      <option value="">Select project</option>
+                      ${filtersModel.projectOverrides.map((row) => html`<option key=${row.jiraProjectKey} value=${row.jiraProjectKey}>${row.projectName} (${row.jiraProjectKey})</option>`)}
+                    </select>
+                  </div>`
+                : null}
+              <div className="jira-filter-grid">
+                ${["assignees", "labels", "components"].map((field) => html`
+                  <div className="jira-filter-group" key=${field}>
+                    <label className="jira-filter-label">${field === "assignees" ? "Assignees" : field === "labels" ? "Labels" : "Components"}</label>
+                    <div className="jira-tag-input-row">
+                      <input
+                        className="jira-filter-input"
+                        placeholder=${field === "assignees" ? "e.g. arjun@vymo.com, neha@vymo.com" : field === "labels" ? "e.g. backend, critical-path" : "e.g. api-gateway, auth-service"}
+                        value=${tagDrafts[field]}
+                        onInput=${(event) => setTagDrafts((current) => ({ ...current, [field]: event.target.value }))}
+                        onKeyDown=${(event) => {
+                          if (event.key === "Enter") {
+                            event.preventDefault();
+                            addTagListValues(field);
+                          }
+                        }}
+                      />
+                      <button className="btn btn-secondary jira-tag-add-btn" onClick=${() => addTagListValues(field)}>Add</button>
+                    </div>
+                    <div className="jira-tag-wrap">
+                      ${(editorFilter[field] || []).map((value) => html`
+                        <span key=${value} className="jira-tag">${value}<button className="jira-tag-remove" onClick=${() => removeTagListValue(field, value)}>✕</button></span>
+                      `)}
+                    </div>
+                  </div>
+                `)}
+                <div className="jira-filter-group">
+                  <label className="jira-filter-label">Sprint</label>
+                  <select className="jira-filter-input" value=${editorFilter.sprintMode} onChange=${(event) => setFilterField("sprintMode", event.target.value)}>
+                    <option value="all">All sprints</option>
+                    <option value="active">Active sprint only</option>
+                    <option value="backlog">Backlog (no sprint)</option>
+                    <option value="Sprint 42">Sprint 42</option>
+                    <option value="Sprint 41">Sprint 41</option>
+                    <option value="Sprint 40">Sprint 40</option>
+                  </select>
+                </div>
+                <div className="jira-filter-group">
+                  <label className="jira-filter-label">Status Category</label>
+                  <select className="jira-filter-input" value=${editorFilter.statusCategory} onChange=${(event) => setFilterField("statusCategory", event.target.value)}>
+                    <option value="not-done">Not Done (default)</option>
+                    <option value="all">All statuses</option>
+                    <option value="to-do">To Do only</option>
+                    <option value="in-progress">In Progress only</option>
+                  </select>
+                </div>
+                <div className="jira-filter-group">
+                  <label className="jira-filter-label">Issue Types</label>
+                  <select
+                    className="jira-filter-input jira-filter-multi"
+                    multiple
+                    value=${editorFilter.issueTypes}
+                    onChange=${(event) => setFilterField("issueTypes", withUnique([...event.target.selectedOptions].map((option) => option.value)))}
+                  >
+                    ${issueTypeOptions.map((option) => html`<option key=${option} value=${option}>${option}</option>`)}
+                  </select>
+                </div>
+                <div className="jira-filter-group">
+                  <label className="jira-filter-label">Priority</label>
+                  <select className="jira-filter-input" value=${editorFilter.priorityMode} onChange=${(event) => setFilterField("priorityMode", event.target.value)}>
+                    <option value="all">All priorities</option>
+                    <option value="highest">Highest only</option>
+                    <option value="high-up">High & above</option>
+                    <option value="medium-up">Medium & above</option>
+                  </select>
+                </div>
+                <div className="jira-filter-group">
+                  <label className="jira-filter-label">Created After</label>
+                  <input className="jira-filter-input" type="date" value=${editorFilter.createdAfter || ""} onInput=${(event) => setFilterField("createdAfter", event.target.value || null)} />
+                </div>
+              </div>
+              <div className="jira-filter-group" style=${{ marginTop: "12px" }}>
+                <div className="jira-inline-between">
+                  <label className="jira-filter-label">Custom JQL Override</label>
+                  <span className="jira-filter-note">Overrides filters above when non-empty</span>
+                </div>
+                <textarea className="jira-filter-input jira-filter-textarea" value=${editorFilter.customJql || ""} placeholder="e.g. assignee IN (currentUser()) AND sprint IN openSprints()" onInput=${(event) => setFilterField("customJql", event.target.value)}></textarea>
+              </div>
+              <div className="jira-jql-preview">
+                <div className="jira-jql-label">Generated JQL Preview</div>
+                <div className="jira-jql-text">${previewJql}</div>
+              </div>
+              <div className="jira-filter-action-row">
+                <button className="btn btn-secondary" onClick=${() => setBanner({ message: `JQL Preview for ${previewProjectKey || "selected project"} refreshed.`, tone: "info" })}>Preview Results</button>
+                <button className="btn btn-primary" onClick=${applyFiltersAndSync} disabled=${running || savingFilters}>${savingFilters ? "Saving..." : "Apply Filters & Sync"}</button>
+              </div>
+            </div>
+          </section>
+
           <section className="card card-last">
             <div className="card-header">
               <span className="card-title">Sync Log</span>
@@ -2029,6 +2396,54 @@ function JiraPage() {
             </div>
           </section>
 
+          <section className="card">
+            <div className="card-header">
+              <span className="card-title">Active Filters</span>
+              <span className="filter-active-count">${activeFilterCount(effectiveFilter)}</span>
+            </div>
+            <div className="card-body">
+              ${activeSummary.map((item) => html`
+                <div key=${item.label} className="config-row">
+                  <div>
+                    <div className="config-label">${item.label}</div>
+                    <div className="config-sub">${item.value}</div>
+                  </div>
+                  <span className="card-link">✎</span>
+                </div>
+              `)}
+            </div>
+          </section>
+
+          <section className="card">
+            <div className="card-header">
+              <span className="card-title">Per-Project Overrides</span>
+            </div>
+            <div className="card-body">
+              ${filtersModel.projectOverrides.length
+                ? filtersModel.projectOverrides.map((row) => html`
+                    <div key=${row.jiraProjectKey} className="config-row">
+                      <div>
+                        <div className="jira-override-title"><span className="jira-key">${row.jiraProjectKey}</span><span className="config-label">${row.projectName}</span></div>
+                        <div className="config-sub">
+                          ${activeFilterCount(row.filter)
+                            ? `${activeFilterCount(row.filter)} override filter${activeFilterCount(row.filter) === 1 ? "" : "s"} configured`
+                            : "Using global filters"}
+                        </div>
+                      </div>
+                      <button
+                        className="btn btn-secondary jira-mini-btn"
+                        onClick=${() => {
+                          setScope("PROJECT");
+                          setSelectedProjectKey(row.jiraProjectKey);
+                          setEditorFilter(normalizeFilter(row.filter));
+                        }}
+                      >${activeFilterCount(row.filter) ? "Edit" : "Add"}</button>
+                    </div>
+                  `)
+                : html`<div className="notice">No per-project overrides configured.</div>`}
+            </div>
+          </section>
+
           <section className="card card-last">
             <div className="card-header"><span className="card-title">Sync Configuration</span></div>
             <div className="card-body">
@@ -2050,36 +2465,105 @@ function JiraPage() {
 }
 
 function SettingsPage() {
-  const [state, setState] = useState({ dashboard: null, devs: [], projects: [], banner: null, error: "" });
+  const [state, setState] = useState({ dashboard: null, devs: [], projects: [], jiraTeams: [], banner: null, error: "" });
+  const [showDevForm, setShowDevForm] = useState(false);
+  const [showProjectForm, setShowProjectForm] = useState(false);
+  const [devDraft, setDevDraft] = useState({
+    name: "",
+    email: "",
+    role: "DEVELOPER",
+    weeklyCapacityHours: "40",
+    jiraUsername: "",
+    teamId: ""
+  });
+  const [projectDraft, setProjectDraft] = useState({
+    name: "",
+    jiraProjectKey: "",
+    targetUtilizationPct: "70",
+    deliveryMode: "HYBRID",
+    teamId: "",
+    permittedTeamIds: []
+  });
+
+  async function load(ignore = false) {
+    const [dashboardRes, devsRes, projectsRes, jiraTeamsRes] = await Promise.allSettled([
+        api("/api/dashboard-summary"),
+        api("/api/developers"),
+        api("/api/projects"),
+        api("/api/teams/jira-linked").catch(() => [])
+    ]);
+    if (ignore) return;
+    const dashboard = dashboardRes.status === "fulfilled" ? dashboardRes.value : null;
+    const devs = devsRes.status === "fulfilled" ? devsRes.value : [];
+    const projects = projectsRes.status === "fulfilled" ? projectsRes.value : [];
+    const jiraTeams = jiraTeamsRes.status === "fulfilled" ? jiraTeamsRes.value : [];
+    const modeCounts = deliveryModeSummary(projects);
+    const banner = jiraTeams.length
+      ? dashboard
+        ? { message: `Planning is live in ${humanize(dashboard.planningMode || "SPRINT")} mode. ${modeCounts.KANBAN} Kanban, ${modeCounts.SPRINT} sprint, and ${modeCounts.HYBRID} hybrid projects are configured.`, tone: "info" }
+        : { message: "Planning metadata is not available yet. Project and developer settings still load normally.", tone: "warning" }
+      : { message: "No Jira-linked teams found. Map Jira projects to teams first, then add users and projects.", tone: "warning" };
+    setState({ dashboard, devs, projects, jiraTeams, banner, error: "" });
+  }
 
   useEffect(() => {
     let ignore = false;
-    async function load() {
-      const [dashboardRes, devsRes, projectsRes] = await Promise.allSettled([
-        api("/api/dashboard-summary"),
-        api("/api/developers"),
-        api("/api/projects")
-      ]);
-      if (ignore) return;
-      const dashboard = dashboardRes.status === "fulfilled" ? dashboardRes.value : null;
-      const devs = devsRes.status === "fulfilled" ? devsRes.value : [];
-      const projects = projectsRes.status === "fulfilled" ? projectsRes.value : [];
-      const modeCounts = deliveryModeSummary(projects);
-      const banner = dashboard
-        ? { message: `Planning is live in ${humanize(dashboard.planningMode || "SPRINT")} mode. ${modeCounts.KANBAN} Kanban, ${modeCounts.SPRINT} sprint, and ${modeCounts.HYBRID} hybrid projects are configured.`, tone: "info" }
-        : { message: "Planning metadata is not available yet. Project and developer settings still load normally.", tone: "warning" };
-      setState({ dashboard, devs, projects, banner, error: "" });
-    }
-    load().catch((loadError) => {
+    load(ignore).catch((loadError) => {
       if (!ignore) {
-        setState({ dashboard: null, devs: [], projects: [], banner: { message: `Some data could not be loaded: ${loadError.message}`, tone: "error" }, error: loadError.message });
+        setState({ dashboard: null, devs: [], projects: [], jiraTeams: [], banner: { message: `Some data could not be loaded: ${loadError.message}`, tone: "error" }, error: loadError.message });
       }
     });
     return () => { ignore = true; };
   }, []);
 
+  async function addDeveloper(event) {
+    event.preventDefault();
+    try {
+      await api("/api/developers", {
+        method: "POST",
+        body: JSON.stringify({
+          ...devDraft,
+          weeklyCapacityHours: Number(devDraft.weeklyCapacityHours),
+          teamId: Number(devDraft.teamId)
+        })
+      });
+      setDevDraft({ name: "", email: "", role: "DEVELOPER", weeklyCapacityHours: "40", jiraUsername: "", teamId: "" });
+      setShowDevForm(false);
+      await load();
+    } catch (createError) {
+      setState((current) => ({ ...current, error: createError.message, banner: { message: `Failed to add developer: ${createError.message}`, tone: "error" } }));
+    }
+  }
+
+  async function addProject(event) {
+    event.preventDefault();
+    try {
+      const primaryTeamId = Number(projectDraft.teamId);
+      const permittedTeamIds = [...new Set([primaryTeamId, ...(projectDraft.permittedTeamIds || []).map((id) => Number(id))].filter((id) => Number.isFinite(id) && id > 0))];
+      await api("/api/projects", {
+        method: "POST",
+        body: JSON.stringify({
+          ...projectDraft,
+          targetUtilizationPct: Number(projectDraft.targetUtilizationPct),
+          teamId: primaryTeamId,
+          permittedTeamIds
+        })
+      });
+      setProjectDraft({ name: "", jiraProjectKey: "", targetUtilizationPct: "70", deliveryMode: "HYBRID", teamId: "", permittedTeamIds: [] });
+      setShowProjectForm(false);
+      await load();
+    } catch (createError) {
+      setState((current) => ({ ...current, error: createError.message, banner: { message: `Failed to add project: ${createError.message}`, tone: "error" } }));
+    }
+  }
+
   const modeCounts = deliveryModeSummary(state.projects);
   const visibleDevelopers = state.devs.slice(0, 6);
+  const selectedDevTeam = state.jiraTeams.find((team) => String(team.teamId) === String(devDraft.teamId));
+  const selectedProjectTeam = state.jiraTeams.find((team) => String(team.teamId) === String(projectDraft.teamId));
+  const selectedProjectPermittedTeamNames = state.jiraTeams
+    .filter((team) => (projectDraft.permittedTeamIds || []).some((id) => String(id) === String(team.teamId)))
+    .map((team) => team.teamName);
   const leaveTypes = [
     { name: "Planned Leave", note: "Managed in leave calendar", tone: "ltb-paid", color: "#bfdbfe" },
     { name: "Sick Leave", note: "Short-notice absences", tone: "ltb-paid", color: "#fed7aa" },
@@ -2120,14 +2604,45 @@ function SettingsPage() {
                 <div className="sc-title">Developers</div>
                 <div className="sc-sub">${state.devs.length} members · Profiles available to planning screens</div>
               </div>
-              <a className="btn btn-primary" href="/developer-detail" style=${{ fontSize: "12px", padding: "7px 12px" }}>+ Add Developer</a>
+              <button className="btn btn-primary" style=${{ fontSize: "12px", padding: "7px 12px" }} onClick=${() => setShowDevForm((current) => !current)}>
+                ${showDevForm ? "Hide Form" : "+ Add Developer"}
+              </button>
             </div>
             <div className="sc-body">
+              ${showDevForm
+                ? html`
+                    <form className="settings-inline-form" onSubmit=${addDeveloper}>
+                      <div className="settings-form-grid">
+                        <input className="form-input" placeholder="Name" value=${devDraft.name} onInput=${(event) => setDevDraft((current) => ({ ...current, name: event.target.value }))} required />
+                        <input className="form-input" placeholder="Email" type="email" value=${devDraft.email} onInput=${(event) => setDevDraft((current) => ({ ...current, email: event.target.value }))} required />
+                        <select className="form-input" value=${devDraft.role} onChange=${(event) => setDevDraft((current) => ({ ...current, role: event.target.value }))}>
+                          <option value="DEVELOPER">Developer</option>
+                          <option value="TECH_LEAD">Tech Lead</option>
+                          <option value="PROJECT_MANAGER">Project Manager</option>
+                          <option value="ENGINEERING_MANAGER">Engineering Manager</option>
+                        </select>
+                        <input className="form-input" type="number" min="1" max="80" placeholder="Weekly Capacity" value=${devDraft.weeklyCapacityHours} onInput=${(event) => setDevDraft((current) => ({ ...current, weeklyCapacityHours: event.target.value }))} required />
+                        <input className="form-input" placeholder="Jira Username" value=${devDraft.jiraUsername} onInput=${(event) => setDevDraft((current) => ({ ...current, jiraUsername: event.target.value }))} />
+                        <select className="form-input" value=${devDraft.teamId} onChange=${(event) => setDevDraft((current) => ({ ...current, teamId: event.target.value }))} required>
+                          <option value="">Select Jira-linked Team</option>
+                          ${state.jiraTeams.map((team) => html`<option key=${team.teamId} value=${team.teamId}>${team.teamName}</option>`)}
+                        </select>
+                      </div>
+                      <div className="settings-subtle" style=${{ marginTop: "6px" }}>
+                        ${selectedDevTeam ? `Team projects: ${(selectedDevTeam.projects || []).map((project) => `${project.projectName} (${project.jiraProjectKey})`).join(", ")}` : "Team list is sourced from Jira-linked project mappings"}
+                      </div>
+                      <div className="settings-form-actions">
+                        <button className="btn btn-primary" type="submit" disabled=${!state.jiraTeams.length}>Create Developer</button>
+                      </div>
+                    </form>
+                  `
+                : null}
               <table className="dev-table">
                 <thead>
                   <tr>
                     <th>Name</th>
                     <th>Role</th>
+                    <th>Team</th>
                     <th>Weekly Capacity</th>
                     <th>Jira Username</th>
                     <th>Status</th>
@@ -2148,15 +2663,16 @@ function SettingsPage() {
                             </div>
                           </td>
                           <td><span className="settings-inline-pill">${humanize(dev.role)}</span></td>
+                          <td>${dev.teamName || "-"}</td>
                           <td><input className="capacity-input" value=${dev.weeklyCapacityHours ?? 40} readOnly /> h/week</td>
                           <td><input className="capacity-input settings-jira-input" value=${dev.jiraUsername || ""} readOnly /></td>
                           <td><span className="active-dot"></span> Active</td>
                           <td><div className="action-btns"><div className="btn-icon">✏️</div><div className="btn-icon del">🗑</div></div></td>
                         </tr>
                       `)
-                    : html`<tr><td colSpan="6" className="notice">No developers configured</td></tr>`}
+                    : html`<tr><td colSpan="7" className="notice">No developers configured</td></tr>`}
                   ${state.devs.length > visibleDevelopers.length
-                    ? html`<tr className="settings-overflow-row"><td colSpan="6">+ ${state.devs.length - visibleDevelopers.length} more developers available in the workspace</td></tr>`
+                    ? html`<tr className="settings-overflow-row"><td colSpan="7">+ ${state.devs.length - visibleDevelopers.length} more developers available in the workspace</td></tr>`
                     : null}
                 </tbody>
               </table>
@@ -2169,14 +2685,70 @@ function SettingsPage() {
                 <div className="sc-title">Projects</div>
                 <div className="sc-sub">${state.projects.length} active projects</div>
               </div>
-              <a className="btn btn-primary" href="/capacity-planner" style=${{ fontSize: "12px", padding: "7px 12px" }}>+ Add Project</a>
+              <button className="btn btn-primary" style=${{ fontSize: "12px", padding: "7px 12px" }} onClick=${() => setShowProjectForm((current) => !current)}>
+                ${showProjectForm ? "Hide Form" : "+ Add Project"}
+              </button>
             </div>
             <div className="sc-body">
+              ${showProjectForm
+                ? html`
+                    <form className="settings-inline-form" onSubmit=${addProject}>
+                      <div className="settings-form-grid">
+                        <input className="form-input" placeholder="Project Name" value=${projectDraft.name} onInput=${(event) => setProjectDraft((current) => ({ ...current, name: event.target.value }))} required />
+                        <input className="form-input" placeholder="Jira Key (optional)" value=${projectDraft.jiraProjectKey} onInput=${(event) => setProjectDraft((current) => ({ ...current, jiraProjectKey: event.target.value.toUpperCase() }))} />
+                        <select className="form-input" value=${projectDraft.deliveryMode} onChange=${(event) => setProjectDraft((current) => ({ ...current, deliveryMode: event.target.value }))}>
+                          <option value="HYBRID">Hybrid</option>
+                          <option value="SPRINT">Sprint</option>
+                          <option value="KANBAN">Kanban</option>
+                        </select>
+                        <input className="form-input" type="number" min="0" max="100" value=${projectDraft.targetUtilizationPct} onInput=${(event) => setProjectDraft((current) => ({ ...current, targetUtilizationPct: event.target.value }))} required />
+                        <select
+                          className="form-input"
+                          value=${projectDraft.teamId}
+                          onChange=${(event) => {
+                            const nextTeamId = event.target.value;
+                            setProjectDraft((current) => ({
+                              ...current,
+                              teamId: nextTeamId,
+                              permittedTeamIds: [...new Set([nextTeamId, ...(current.permittedTeamIds || [])].filter(Boolean))]
+                            }));
+                          }}
+                          required
+                        >
+                          <option value="">Select Jira-linked Team</option>
+                          ${state.jiraTeams.map((team) => html`<option key=${team.teamId} value=${team.teamId}>${team.teamName}</option>`)}
+                        </select>
+                        <select
+                          className="form-input"
+                          multiple
+                          value=${projectDraft.permittedTeamIds}
+                          onChange=${(event) => {
+                            const selected = [...event.target.selectedOptions].map((option) => option.value);
+                            const next = [...new Set([projectDraft.teamId, ...selected].filter(Boolean))];
+                            setProjectDraft((current) => ({ ...current, permittedTeamIds: next }));
+                          }}
+                        >
+                          ${state.jiraTeams.map((team) => html`<option key=${`perm-${team.teamId}`} value=${String(team.teamId)}>${team.teamName}</option>`)}
+                        </select>
+                      </div>
+                      <div className="settings-subtle" style=${{ marginTop: "6px" }}>
+                        ${selectedProjectTeam
+                          ? `Primary team: ${selectedProjectTeam.teamName}. Permitted teams: ${(selectedProjectPermittedTeamNames.length ? selectedProjectPermittedTeamNames.join(", ") : selectedProjectTeam.teamName)}`
+                          : "Team list is sourced from Jira-linked project mappings"}
+                      </div>
+                      <div className="settings-form-actions">
+                        <button className="btn btn-primary" type="submit" disabled=${!state.jiraTeams.length}>Create Project</button>
+                      </div>
+                    </form>
+                  `
+                : null}
               <table className="proj-table">
                 <thead>
                   <tr>
                     <th>Project</th>
                     <th>Jira Key</th>
+                    <th>Primary Team</th>
+                    <th>Permitted Teams</th>
                     <th>Delivery Mode</th>
                     <th>Target Utilization</th>
                     <th>Status</th>
@@ -2189,13 +2761,15 @@ function SettingsPage() {
                         <tr key=${project.id}>
                           <td><span className="proj-color" style=${{ background: ["#6366f1", "#a855f7", "#f97316", "#22c55e", "#ef4444"][index % 5] }}></span><strong>${project.name}</strong></td>
                           <td className="settings-mono">${project.jiraProjectKey || "-"}</td>
+                          <td>${project.teamName || "-"}</td>
+                          <td>${(project.permittedTeamNames || []).length ? project.permittedTeamNames.join(", ") : (project.teamName || "-")}</td>
                           <td>${humanize(project.deliveryMode || "HYBRID")}</td>
                           <td><input className="capacity-input" value=${project.targetUtilizationPct ?? 70} readOnly />%</td>
                           <td><span className="active-dot"></span> ${project.active === false ? "Inactive" : "Active"}</td>
                           <td><div className="action-btns"><div className="btn-icon">✏️</div><div className="btn-icon del">🗑</div></div></td>
                         </tr>
                       `)
-                    : html`<tr><td colSpan="6" className="notice">No projects configured</td></tr>`}
+                    : html`<tr><td colSpan="8" className="notice">No projects configured</td></tr>`}
                 </tbody>
               </table>
             </div>

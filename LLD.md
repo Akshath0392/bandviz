@@ -1,9 +1,9 @@
 # BandViz — Low-Level Design Document
 
-**Version:** 1.0
-**Date:** 2026-03-25
+**Version:** 1.1
+**Date:** 2026-04-03
 **Author:** Post-Sales Engineering
-**Status:** Draft
+**Status:** Updated
 
 ---
 
@@ -44,7 +44,7 @@ BandViz is an internal bandwidth management tool for a 17-developer post-sales e
 
 | Layer         | Technology                          |
 |---------------|-------------------------------------|
-| Language      | Java 21                             |
+| Language      | Java 25                             |
 | Framework     | Spring Boot 3.2.x                   |
 | ORM           | Spring Data JPA + Hibernate 6       |
 | Database      | PostgreSQL 16                       |
@@ -52,7 +52,7 @@ BandViz is an internal bandwidth management tool for a 17-developer post-sales e
 | API Docs      | Springdoc OpenAPI 2.x (Swagger UI)  |
 | Jira Client   | RestTemplate + Jira REST API v3     |
 | Build         | Maven                               |
-| Frontend      | React (separate repo, out of scope) |
+| Frontend      | React served from Spring static resources (`src/main/resources/static/react-app`) |
 
 ### 1.4 Non-Goals (v1)
 - Authentication / authorization (no JWT, no roles)
@@ -69,8 +69,8 @@ BandViz is an internal bandwidth management tool for a 17-developer post-sales e
 
 ```
 ┌───────────────────────────────────────────────────────┐
-│                  React Frontend                        │
-│          (Separate repo, consumes REST API)             │
+│            React Frontend (served by Spring)            │
+│            (Browser ES modules + REST API)              │
 └──────────────────────┬────────────────────────────────┘
                        │  HTTP / JSON
                        ▼
@@ -137,10 +137,12 @@ com.vymo.bandviz/
 ├── domain/
 │   ├── Developer.java                 # @Entity
 │   ├── Project.java                   # @Entity
+│   ├── Team.java                      # @Entity
 │   ├── Assignment.java                # @Entity (dev ↔ project allocation)
 │   ├── Leave.java                     # @Entity
 │   ├── Sprint.java                    # @Entity
 │   ├── JiraTicket.java                # @Entity (synced from Jira)
+│   ├── JiraSyncFilter.java            # @Entity (persisted Jira filters)
 │   └── enums/
 │       ├── DeveloperRole.java
 │       ├── LeaveType.java
@@ -152,10 +154,12 @@ com.vymo.bandviz/
 ├── repository/
 │   ├── DeveloperRepository.java
 │   ├── ProjectRepository.java
+│   ├── TeamRepository.java
 │   ├── AssignmentRepository.java
 │   ├── LeaveRepository.java
 │   ├── SprintRepository.java
-│   └── JiraTicketRepository.java
+│   ├── JiraTicketRepository.java
+│   └── JiraSyncFilterRepository.java
 │
 ├── dto/
 │   ├── request/
@@ -167,6 +171,8 @@ com.vymo.bandviz/
 │   └── response/
 │       ├── DeveloperResponse.java
 │       ├── ProjectResponse.java
+│       ├── TeamResponse.java
+│       ├── JiraLinkedTeamResponse.java
 │       ├── AssignmentResponse.java
 │       ├── LeaveResponse.java
 │       ├── SprintResponse.java
@@ -176,6 +182,7 @@ com.vymo.bandviz/
 ├── service/
 │   ├── DeveloperService.java
 │   ├── ProjectService.java
+│   ├── TeamService.java
 │   ├── AssignmentService.java
 │   ├── LeaveService.java
 │   ├── BandwidthService.java          # Core bandwidth engine
@@ -185,6 +192,7 @@ com.vymo.bandviz/
 ├── controller/
 │   ├── DeveloperController.java
 │   ├── ProjectController.java
+│   ├── TeamController.java
 │   ├── AssignmentController.java
 │   ├── LeaveController.java
 │   ├── SprintController.java
@@ -219,6 +227,7 @@ com.vymo.bandviz/
 | `role`                | VARCHAR(50)  | NOT NULL                  | Enum: DeveloperRole     |
 | `weekly_capacity_hours`| INTEGER     | NOT NULL, DEFAULT 40      | 1–80 range              |
 | `jira_username`       | VARCHAR(100) | UNIQUE                    | Jira email / accountId  |
+| `team_id`             | BIGINT       | NOT NULL, FK → teams(id)  | Team ownership          |
 | `active`              | BOOLEAN      | NOT NULL, DEFAULT true    | Soft delete flag        |
 
 #### `projects`
@@ -229,6 +238,8 @@ com.vymo.bandviz/
 | `jira_project_key`      | VARCHAR(20)  | UNIQUE                    | e.g., "VYMO"         |
 | `color`                 | VARCHAR(10)  |                           | Hex code for UI       |
 | `target_utilization_pct`| INTEGER      | NOT NULL, DEFAULT 70      | 0–100                 |
+| `delivery_mode`         | VARCHAR(20)  | NOT NULL, DEFAULT HYBRID  | Enum: ProjectDeliveryMode |
+| `team_id`               | BIGINT       | NOT NULL, FK → teams(id)  | Primary owning team   |
 | `active`                | BOOLEAN      | NOT NULL, DEFAULT true    |                       |
 
 #### `assignments`
@@ -285,6 +296,26 @@ com.vymo.bandviz/
 
 **Index:** `idx_jira_tickets_assignee ON (assignee_jira_username)` — developer detail lookups.
 **Index:** `idx_jira_tickets_project ON (project_key)` — project breakdown queries.
+
+#### `teams`
+| Column        | Type         | Constraints            | Notes            |
+|---------------|--------------|------------------------|------------------|
+| `id`          | BIGSERIAL    | PK                     |                  |
+| `name`        | VARCHAR(255) | NOT NULL, UNIQUE       |                  |
+| `description` | TEXT         |                        |                  |
+| `active`      | BOOLEAN      | NOT NULL, DEFAULT true | Soft delete flag |
+
+#### `project_team_permissions`
+| Column       | Type   | Constraints                   | Notes |
+|--------------|--------|-------------------------------|-------|
+| `project_id` | BIGINT | NOT NULL, FK → projects(id)   |       |
+| `team_id`    | BIGINT | NOT NULL, FK → teams(id)      |       |
+
+**Primary key:** `(project_id, team_id)`  
+Used for many-to-many project permissions. A project has one primary owner (`projects.team_id`) and one or more permitted teams (`project_team_permissions`).
+
+#### `jira_sync_filters`
+Persists global and project-level Jira sync filters (scope-aware filter configuration).
 
 ---
 
@@ -409,7 +440,8 @@ TicketPriority:
   "email": "arjun.k@vymo.com",
   "role": "SENIOR_BACKEND_ENGINEER",
   "weeklyCapacityHours": 40,
-  "jiraUsername": "arjun.k@vymo.com"
+  "jiraUsername": "arjun.k@vymo.com",
+  "teamId": 8
 }
 ```
 
@@ -422,6 +454,8 @@ TicketPriority:
   "role": "SENIOR_BACKEND_ENGINEER",
   "weeklyCapacityHours": 40,
   "jiraUsername": "arjun.k@vymo.com",
+  "teamId": 8,
+  "teamName": "Collections BAU",
   "active": true
 }
 ```
@@ -442,19 +476,33 @@ TicketPriority:
   "name": "CRM Core",
   "jiraProjectKey": "VYMO",
   "color": "#6366f1",
-  "targetUtilizationPct": 70
+  "targetUtilizationPct": 70,
+  "deliveryMode": "HYBRID",
+  "teamId": 8,
+  "permittedTeamIds": [8, 12]
 }
 ```
+
+### 7.2.1 Teams
+
+| Method   | Endpoint              | Request Body    | Response            | Status |
+|----------|-----------------------|-----------------|---------------------|--------|
+| `GET`    | `/api/teams`          | —               | `TeamResponse[]`    | 200 |
+| `GET`    | `/api/teams/{id}`     | —               | `TeamResponse`      | 200 |
+| `GET`    | `/api/teams/jira-linked` | —            | `JiraLinkedTeamResponse[]` | 200 |
+| `POST`   | `/api/teams`          | `TeamRequest`   | `TeamResponse`      | 201 |
+| `PUT`    | `/api/teams/{id}`     | `TeamRequest`   | `TeamResponse`      | 200 |
+| `DELETE` | `/api/teams/{id}`     | —               | —                   | 204 |
 
 ### 7.3 Assignments
 
 | Method   | Endpoint                         | Request Body         | Response                | Status |
 |----------|----------------------------------|----------------------|-------------------------|--------|
-| `GET`    | `/api/assignments?developerId=1` | —                    | `AssignmentResponse[]`  | 200 |
-| `GET`    | `/api/assignments?projectId=2`   | —                    | `AssignmentResponse[]`  | 200 |
-| `POST`   | `/api/assignments`               | `AssignmentRequest`  | `AssignmentResponse`    | 201 |
-| `PUT`    | `/api/assignments/{id}`          | `AssignmentRequest`  | `AssignmentResponse`    | 200 |
-| `DELETE` | `/api/assignments/{id}`          | —                    | —                       | 204 |
+| `GET`    | `/api/project-allocations?developerId=1` | —                    | `AssignmentResponse[]`  | 200 |
+| `GET`    | `/api/project-allocations?projectId=2`   | —                    | `AssignmentResponse[]`  | 200 |
+| `POST`   | `/api/project-allocations`               | `AssignmentRequest`  | `AssignmentResponse`    | 201 |
+| `PUT`    | `/api/project-allocations/{id}`          | `AssignmentRequest`  | `AssignmentResponse`    | 200 |
+| `DELETE` | `/api/project-allocations/{id}`          | —                    | —                       | 204 |
 
 **AssignmentRequest:**
 ```json
@@ -485,12 +533,12 @@ TicketPriority:
 
 | Method   | Endpoint                | Request Body   | Response            | Status |
 |----------|-------------------------|----------------|---------------------|--------|
-| `GET`    | `/api/leaves?developerId=1` | —          | `LeaveResponse[]`   | 200 |
-| `GET`    | `/api/leaves/pending`   | —              | `LeaveResponse[]`   | 200 |
-| `POST`   | `/api/leaves`           | `LeaveRequest` | `LeaveResponse`     | 201 |
-| `POST`   | `/api/leaves/{id}/approve` | —           | `LeaveResponse`     | 200 |
-| `POST`   | `/api/leaves/{id}/reject`  | —           | `LeaveResponse`     | 200 |
-| `DELETE` | `/api/leaves/{id}`      | —              | —                   | 204 |
+| `GET`    | `/api/leave-requests?developerId=1` | —    | `LeaveResponse[]`   | 200 |
+| `GET`    | `/api/leave-requests/pending-approvals` | — | `LeaveResponse[]`   | 200 |
+| `POST`   | `/api/leave-requests`           | `LeaveRequest` | `LeaveResponse`     | 201 |
+| `POST`   | `/api/leave-requests/{id}/approve` | —   | `LeaveResponse`     | 200 |
+| `POST`   | `/api/leave-requests/{id}/reject`  | —   | `LeaveResponse`     | 200 |
+| `DELETE` | `/api/leave-requests/{id}`      | —      | —                   | 204 |
 
 **Query params for GET list:**
 - `developerId` (Long) — filter by developer
@@ -527,7 +575,7 @@ TicketPriority:
 | Method   | Endpoint              | Request Body     | Response            | Status |
 |----------|-----------------------|------------------|---------------------|--------|
 | `GET`    | `/api/sprints`        | —                | `SprintResponse[]`  | 200 |
-| `GET`    | `/api/sprints/active` | —                | `SprintResponse`    | 200 |
+| `GET`    | `/api/sprints/current` | —               | `SprintResponse`    | 200 |
 | `POST`   | `/api/sprints`        | `SprintRequest`  | `SprintResponse`    | 201 |
 | `PUT`    | `/api/sprints/{id}`   | `SprintRequest`  | `SprintResponse`    | 200 |
 
@@ -535,9 +583,9 @@ TicketPriority:
 
 | Method | Endpoint                         | Response                        | Status |
 |--------|----------------------------------|---------------------------------|--------|
-| `GET`  | `/api/bandwidth`                 | `DeveloperBandwidthResponse[]`  | 200 |
-| `GET`  | `/api/bandwidth?sprintId=5`      | `DeveloperBandwidthResponse[]`  | 200 |
-| `GET`  | `/api/bandwidth?start=...&end=...` | `DeveloperBandwidthResponse[]` | 200 |
+| `GET`  | `/api/capacity`                 | `DeveloperBandwidthResponse[]`  | 200 |
+| `GET`  | `/api/capacity?sprintId=5`      | `DeveloperBandwidthResponse[]`  | 200 |
+| `GET`  | `/api/capacity?start=...&end=...` | `DeveloperBandwidthResponse[]` | 200 |
 
 **DeveloperBandwidthResponse:**
 ```json
@@ -576,8 +624,8 @@ TicketPriority:
 
 | Method | Endpoint                        | Response            | Status |
 |--------|---------------------------------|---------------------|--------|
-| `GET`  | `/api/dashboard`                | `DashboardResponse` | 200 |
-| `GET`  | `/api/dashboard?sprintId=5`     | `DashboardResponse` | 200 |
+| `GET`  | `/api/dashboard-summary`                | `DashboardResponse` | 200 |
+| `GET`  | `/api/dashboard-summary?sprintId=5`     | `DashboardResponse` | 200 |
 
 **DashboardResponse:**
 ```json
@@ -606,8 +654,8 @@ TicketPriority:
 
 | Method | Endpoint            | Response              | Status |
 |--------|---------------------|-----------------------|--------|
-| `POST` | `/api/jira/sync`    | `SyncResult`          | 200 |
-| `GET`  | `/api/jira/status`  | `SyncStatusResponse`  | 200 |
+| `POST` | `/api/jira-sync/runs`    | `SyncResult`          | 200 |
+| `GET`  | `/api/jira-sync/status`  | `SyncStatusResponse`  | 200 |
 
 **SyncResult:**
 ```json
@@ -673,7 +721,7 @@ JiraSyncController ──▶ JiraSyncService
 | `LeaveService`      | findByDev, findPending, apply, approve, reject, delete, countApprovedLeaveDays, countWorkingDays | Core leave logic + utility methods |
 | `BandwidthService`  | computeForPeriod, computeForActiveSprint, computeForSprint    | Core bandwidth engine |
 | `DashboardService`  | getActiveSprint, getForSprint                                 | Aggregation + alerts |
-| `JiraSyncService`   | syncAll (scheduled), getStatus                                | Jira pull + upsert |
+| `JiraSyncService`   | syncAll (scheduled), getStatus, getProjectMappings, getFilters, save/reset filters | Jira pull + upsert + filter persistence |
 
 ---
 
@@ -768,7 +816,7 @@ Status: AVAILABLE (<70%)
 ### 10.2 Sync Flow
 
 ```
-1. JiraSyncService.syncAll() fires every 15 min (or on-demand via POST /api/jira/sync)
+1. JiraSyncService.syncAll() fires every 15 min (or on-demand via POST /api/jira-sync/runs)
 2. Load all active projects that have a jiraProjectKey
 3. For each project:
    a. Build JQL: "project = {KEY} AND statusCategory != Done ORDER BY updated DESC"
@@ -810,7 +858,7 @@ Status: AVAILABLE (<70%)
 
 ### 10.6 Error Handling
 - 429 (Rate Limit): Log warning, skip project, retry on next scheduled run
-- 401 (Auth failure): Log error, mark sync as failed, surface in `/api/jira/status`
+- 401 (Auth failure): Log error, mark sync as failed, surface in `/api/jira-sync/status`
 - Network timeout: 30-second timeout configured on RestTemplate, skip and retry
 
 ---
@@ -822,7 +870,7 @@ Status: AVAILABLE (<70%)
 ```
 Browser                Controller          DashboardService      BandwidthService       DB
   │                        │                     │                     │                 │
-  │ GET /api/dashboard     │                     │                     │                 │
+  │ GET /api/dashboard-summary │                  │                     │                 │
   │───────────────────────▶│                     │                     │                 │
   │                        │ getActiveSprint()   │                     │                 │
   │                        │────────────────────▶│                     │                 │
@@ -864,7 +912,7 @@ Browser                Controller          DashboardService      BandwidthServic
 ```
 Manager                   LeaveController     LeaveService          DB
   │                            │                   │                 │
-  │ POST /api/leaves/5/approve │                   │                 │
+  │ POST /api/leave-requests/5/approve │           │                 │
   │───────────────────────────▶│                   │                 │
   │                            │ approve(5)        │                 │
   │                            │──────────────────▶│                 │
@@ -958,6 +1006,7 @@ All errors return a consistent JSON shape via `@ControllerAdvice`:
 
 ```yaml
 # Database
+spring.config.import: optional:file:.env[.properties]
 spring.datasource.url: jdbc:postgresql://localhost:5432/bandviz
 spring.datasource.username: ${DB_USERNAME}
 spring.datasource.password: ${DB_PASSWORD}
@@ -967,6 +1016,7 @@ bandviz.jira.base-url: ${JIRA_BASE_URL}
 bandviz.jira.email: ${JIRA_EMAIL}
 bandviz.jira.api-token: ${JIRA_API_TOKEN}
 bandviz.jira.sync-enabled: ${JIRA_SYNC_ENABLED:false}
+bandviz.jira.project-keys: ${JIRA_PROJECT_KEYS:}
 
 # Bandwidth thresholds
 bandviz.bandwidth.overload-threshold: 85
@@ -981,6 +1031,24 @@ bandviz.bandwidth.default-weekly-capacity-hours: 40
 | `default`| Local development             | PostgreSQL  | Disabled |
 | `test`   | Unit/integration tests        | H2 in-memory| Disabled |
 | `prod`   | Production                    | PostgreSQL  | Enabled  |
+
+### 13.3 Seed Script Configuration
+
+Global Jira seeding is driven by `scripts/seed_from_jira.sh` and auto-loads `.env` from project root.
+
+Required variables for `seed-global`:
+- `JIRA_BASE_URL`
+- `JIRA_EMAIL`
+- `JIRA_API_TOKEN`
+- `ATLASSIAN_ORG_ID`
+- `ATLASSIAN_SITE_ID`
+- one of `ATLASSIAN_TEAM_NAMES` or `ATLASSIAN_TEAM_IDS`
+- `ATLASSIAN_TEAM_PROJECT_KEYS_JSON`
+
+`seed-global` sync order:
+1. Teams (`/api/teams`)
+2. Projects (`/api/projects`) with primary `teamId` + `permittedTeamIds`
+3. Developers (`/api/developers`) with `teamId`
 
 ---
 
@@ -1017,7 +1085,7 @@ bandviz.bandwidth.default-weekly-capacity-hours: 40
 
 ## Flyway Migrations
 
-Migration files to be created in `src/main/resources/db/migration/`:
+Migration files currently present in `src/main/resources/db/migration/`:
 
 ```
 V1__create_developers.sql
@@ -1028,9 +1096,16 @@ V5__create_leaves.sql
 V6__create_jira_tickets.sql
 V7__create_indexes.sql
 V8__insert_sample_data.sql
+V9__remove_sample_data.sql
+V10__add_project_delivery_mode.sql
+V11__add_jira_ticket_raw_status.sql
+V12__create_teams_and_add_team_mappings.sql
+V13__create_jira_sync_filters.sql
+V14__enforce_team_mappings.sql
+V15__create_project_team_permissions.sql
 ```
 
-Each migration is idempotent and forward-only (no rollbacks in Flyway by default).
+Migrations are forward-only (no rollbacks in Flyway by default).
 
 ---
 

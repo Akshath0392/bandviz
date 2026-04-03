@@ -18,6 +18,8 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -71,7 +73,10 @@ class DashboardServiceTest {
         when(jiraTicketRepository.countByStatus(TicketStatus.TO_DO)).thenReturn(4L);
         when(jiraTicketRepository.countByStatus(TicketStatus.IN_REVIEW)).thenReturn(2L);
         when(jiraTicketRepository.countByStatus(TicketStatus.BLOCKED)).thenReturn(1L);
-        when(jiraTicketRepository.countByStatus(TicketStatus.DONE)).thenReturn(7L);
+        when(jiraTicketRepository.countByStatusAndLastSyncedAtGreaterThanEqual(
+                TicketStatus.DONE,
+                window.startDate().atStartOfDay()
+        )).thenReturn(7L);
 
         DashboardResponse response = dashboardService.getActiveSprint();
 
@@ -104,7 +109,10 @@ class DashboardServiceTest {
         when(jiraTicketRepository.countByStatus(TicketStatus.TO_DO)).thenReturn(0L);
         when(jiraTicketRepository.countByStatus(TicketStatus.IN_REVIEW)).thenReturn(0L);
         when(jiraTicketRepository.countByStatus(TicketStatus.BLOCKED)).thenReturn(0L);
-        when(jiraTicketRepository.countByStatus(TicketStatus.DONE)).thenReturn(0L);
+        when(jiraTicketRepository.countByStatusAndLastSyncedAtGreaterThanEqual(
+                eq(TicketStatus.DONE),
+                any()
+        )).thenReturn(0L);
 
         DashboardResponse response = dashboardService.getForSprint(42L);
 

@@ -10,30 +10,52 @@ class JiraSeeder
     @jira_base_url = fetch_env("JIRA_BASE_URL")
     @jira_email = fetch_env("JIRA_EMAIL")
     @jira_api_token = fetch_env("JIRA_API_TOKEN")
+
+    @atlassian_org_id = fetch_env("ATLASSIAN_ORG_ID")
+    @atlassian_site_id = fetch_env("ATLASSIAN_SITE_ID")
+
     @bandviz_base_url = ENV.fetch("BANDVIZ_BASE_URL", "http://localhost:8080")
     @default_role = ENV.fetch("BANDVIZ_DEFAULT_DEVELOPER_ROLE", "DEVELOPER")
     @default_capacity = Integer(ENV.fetch("BANDVIZ_DEFAULT_WEEKLY_CAPACITY", "40"))
     @target_utilization = Integer(ENV.fetch("BANDVIZ_DEFAULT_TARGET_UTILIZATION", "70"))
+    @default_delivery_mode = ENV.fetch("BANDVIZ_DEFAULT_DELIVERY_MODE", "HYBRID")
+
     @dry_run = ENV.fetch("DRY_RUN", "false").downcase == "true"
+    @duplicate_user_strategy = ENV.fetch("ATLASSIAN_DUPLICATE_USER_TEAM_STRATEGY", "first").downcase
+
+    @configured_team_ids = csv_env("ATLASSIAN_TEAM_IDS")
+    @configured_team_names = csv_env("ATLASSIAN_TEAM_NAMES")
+    @team_project_map = parse_team_project_map
+
+    @selected_teams = nil
+    @bandviz_team_by_name = {}
+    @dry_run_next_team_id = -1
   end
 
   def run
-    command = ARGV[0] || "seed-all"
+    command = ARGV[0] || "seed-global"
 
     case command
-    when "seed-all"
-      seed_projects
-      seed_developers
+    when "seed-global", "seed-all"
+      sync_teams
+      sync_projects
+      sync_developers
+    when "seed-teams"
+      sync_teams
     when "seed-projects"
-      seed_projects
+      sync_teams
+      sync_projects
     when "seed-developers"
-      seed_developers
+      sync_teams
+      sync_developers
     else
       abort <<~USAGE
         Unknown command: #{command}
 
         Usage:
+          ruby scripts/seed_from_jira.rb seed-global
           ruby scripts/seed_from_jira.rb seed-all
+          ruby scripts/seed_from_jira.rb seed-teams
           ruby scripts/seed_from_jira.rb seed-projects
           ruby scripts/seed_from_jira.rb seed-developers
       USAGE
@@ -42,27 +64,94 @@ class JiraSeeder
 
   private
 
-  def seed_projects
-    jira_projects = jira_get("/rest/api/3/project/search?maxResults=100").fetch("values")
-    existing_projects = bandviz_get("/api/projects?activeOnly=false")
-    existing_by_key = existing_projects.each_with_object({}) do |project, acc|
-      key = project["jiraProjectKey"]
-      acc[key] = project if key && !key.empty?
-    end
+  def sync_teams
+    teams = selected_teams
+    existing = bandviz_get("/api/teams?activeOnly=false")
+    existing_by_name = existing.each_with_object({}) { |team, acc| acc[team.fetch("name")] = team }
 
     created = 0
     updated = 0
     skipped = 0
 
-    jira_projects.each do |project|
-      key = project.fetch("key")
+    teams.each do |team|
+      name = team.fetch("displayName")
       payload = {
-        name: project.fetch("name"),
-        jiraProjectKey: key,
-        targetUtilizationPct: @target_utilization
+        name: name,
+        description: "Synced from Atlassian team #{team.fetch('teamId')}"
       }
 
-      existing = existing_by_key[key]
+      if (row = existing_by_name[name])
+        if row["description"] != payload[:description]
+          bandviz_put("/api/teams/#{row.fetch('id')}", payload)
+          updated += 1
+        else
+          skipped += 1
+        end
+        @bandviz_team_by_name[name] = row.merge("description" => payload[:description])
+      else
+        created_row = bandviz_post("/api/teams", payload)
+        created += 1
+        if @dry_run
+          created_row = created_row.merge("id" => @dry_run_next_team_id)
+          @dry_run_next_team_id -= 1
+        end
+        @bandviz_team_by_name[name] = created_row
+      end
+    end
+
+    puts summary("teams", teams.length, created, updated, skipped)
+  end
+
+  def sync_projects
+    ensure_bandviz_teams_loaded
+
+    jira_projects = fetch_all_jira_projects
+    jira_by_key = jira_projects.each_with_object({}) { |project, acc| acc[project.fetch("key")] = project }
+
+    existing_projects = bandviz_get("/api/projects?activeOnly=false")
+    existing_by_key = existing_projects.each_with_object({}) do |project, acc|
+      key = project["jiraProjectKey"]
+      acc[key] = project if present?(key)
+    end
+
+    created = 0
+    updated = 0
+    skipped = 0
+    project_key_to_team_names = Hash.new { |hash, key| hash[key] = [] }
+
+    selected_teams.each do |team|
+      team_name = team.fetch("displayName")
+      mapped_project_keys_for_team(team).each do |project_key|
+        project_key_to_team_names[project_key] << team_name
+      end
+    end
+
+    project_key_to_team_names.each do |project_key, team_names|
+      jira_project = jira_by_key[project_key]
+      unless jira_project
+        abort("Jira project key '#{project_key}' was mapped but was not returned by Jira project search")
+      end
+
+      unique_team_names = team_names.uniq
+      bandviz_teams = unique_team_names.map do |team_name|
+        team = @bandviz_team_by_name[team_name]
+        abort("BandViz team not found for '#{team_name}'. Run seed-teams first.") if team.nil?
+        team
+      end
+
+      owner_team_id = bandviz_teams.first.fetch("id")
+      permitted_team_ids = bandviz_teams.map { |team| team.fetch("id") }.uniq
+
+      payload = {
+        name: jira_project.fetch("name"),
+        jiraProjectKey: jira_project.fetch("key"),
+        targetUtilizationPct: @target_utilization,
+        deliveryMode: @default_delivery_mode,
+        teamId: owner_team_id,
+        permittedTeamIds: permitted_team_ids
+      }
+
+      existing = existing_by_key[project_key]
       if existing
         if project_changed?(existing, payload)
           bandviz_put("/api/projects/#{existing.fetch('id')}", payload)
@@ -76,91 +165,139 @@ class JiraSeeder
       end
     end
 
-    puts format_summary("projects", jira_projects.length, created, updated, skipped)
+    puts summary("projects", project_key_to_team_names.keys.length, created, updated, skipped)
   end
 
-  def seed_developers
-    org_id = fetch_env("ATLASSIAN_ORG_ID")
-    site_id = fetch_env("ATLASSIAN_SITE_ID")
-    team_ids = resolve_team_ids(org_id, site_id)
-    account_ids = fetch_team_account_ids(org_id, site_id, team_ids)
-    developers = account_ids.map { |account_id| jira_get("/rest/api/3/user?accountId=#{url_encode(account_id)}") }
-    active_developers = developers.select { |user| user["active"] && present?(user["emailAddress"]) }
+  def sync_developers
+    ensure_bandviz_teams_loaded
+
+    account_ids_by_team = selected_teams.each_with_object({}) do |team, acc|
+      acc[team.fetch("displayName")] = fetch_team_account_ids(team.fetch("teamId"))
+    end
 
     existing_developers = bandviz_get("/api/developers?activeOnly=false")
     existing_by_email = existing_developers.each_with_object({}) do |developer, acc|
-      acc[developer["email"]] = developer if present?(developer["email"])
+      email = developer["email"]
+      acc[email] = developer if present?(email)
     end
 
     created = 0
     updated = 0
     skipped = 0
+    seen_emails = Set.new
 
-    active_developers.each do |user|
-      payload = {
-        name: user.fetch("displayName"),
-        email: user.fetch("emailAddress"),
-        role: @default_role,
-        weeklyCapacityHours: @default_capacity,
-        jiraUsername: user.fetch("emailAddress")
-      }
+    account_ids_by_team.each do |team_name, account_ids|
+      bandviz_team = @bandviz_team_by_name[team_name]
+      team_id = bandviz_team.fetch("id")
 
-      existing = existing_by_email[payload[:email]]
-      if existing
-        if developer_changed?(existing, payload)
-          bandviz_put("/api/developers/#{existing.fetch('id')}", payload)
-          updated += 1
-        else
-          skipped += 1
+      account_ids.each do |account_id|
+        user = jira_get("/rest/api/3/user?accountId=#{url_encode(account_id)}")
+        next unless user["active"]
+
+        email = user["emailAddress"]
+        unless present?(email)
+          warn "Skipping account #{account_id} because emailAddress is not available"
+          next
         end
-      else
-        bandviz_post("/api/developers", payload)
-        created += 1
+
+        if seen_emails.include?(email)
+          case @duplicate_user_strategy
+          when "first"
+            next
+          when "error"
+            abort("User #{email} appears in multiple Jira teams. Set ATLASSIAN_DUPLICATE_USER_TEAM_STRATEGY=first to keep first mapping.")
+          else
+            abort("Unsupported ATLASSIAN_DUPLICATE_USER_TEAM_STRATEGY: #{@duplicate_user_strategy}")
+          end
+        end
+
+        seen_emails << email
+
+        payload = {
+          name: user.fetch("displayName"),
+          email: email,
+          role: @default_role,
+          weeklyCapacityHours: @default_capacity,
+          jiraUsername: email,
+          teamId: team_id
+        }
+
+        existing = existing_by_email[email]
+        if existing
+          if developer_changed?(existing, payload)
+            bandviz_put("/api/developers/#{existing.fetch('id')}", payload)
+            updated += 1
+          else
+            skipped += 1
+          end
+        else
+          bandviz_post("/api/developers", payload)
+          created += 1
+        end
       end
     end
 
-    puts format_summary("developers", active_developers.length, created, updated, skipped)
+    puts summary("developers", seen_emails.size, created, updated, skipped)
   end
 
-  def resolve_team_ids(org_id, site_id)
-    configured_team_ids = csv_env("ATLASSIAN_TEAM_IDS")
-    configured_team_names = csv_env("ATLASSIAN_TEAM_NAMES")
+  def selected_teams
+    return @selected_teams if @selected_teams
 
-    if configured_team_ids.empty? && configured_team_names.empty?
-      abort("Provide ATLASSIAN_TEAM_NAMES or ATLASSIAN_TEAM_IDS for developer seeding")
+    if @configured_team_ids.empty? && @configured_team_names.empty?
+      abort("Set ATLASSIAN_TEAM_NAMES or ATLASSIAN_TEAM_IDS")
     end
 
-    return configured_team_ids if configured_team_names.empty?
+    all = fetch_all_teams
+    by_id = all.each_with_object({}) { |team, acc| acc[team.fetch("teamId")] = team }
+    by_name = all.group_by { |team| team.fetch("displayName") }
 
-    teams = fetch_all_teams(org_id, site_id)
-    teams_by_name = teams.group_by { |team| team["displayName"] }
+    selected = []
 
-    resolved_team_ids = configured_team_names.map do |team_name|
-      matches = teams_by_name[team_name] || []
+    @configured_team_ids.each do |team_id|
+      team = by_id[team_id]
+      abort("No Atlassian team found for id '#{team_id}'") unless team
+      selected << team
+    end
 
+    @configured_team_names.each do |team_name|
+      matches = by_name[team_name] || []
       if matches.empty?
-        abort("No Atlassian team found with displayName '#{team_name}'")
+        abort("No Atlassian team found for displayName '#{team_name}'")
       end
-
-      if matches.length > 1
-        team_ids = matches.map { |team| team["teamId"] }.join(", ")
-        abort("Multiple Atlassian teams matched '#{team_name}': #{team_ids}")
+      if matches.size > 1
+        ids = matches.map { |row| row.fetch("teamId") }.join(", ")
+        abort("Multiple Atlassian teams matched '#{team_name}': #{ids}")
       end
-
-      matches.first.fetch("teamId")
+      selected << matches.first
     end
 
-    (configured_team_ids + resolved_team_ids).uniq
+    @selected_teams = selected.uniq { |team| team.fetch("teamId") }
   end
 
-  def fetch_all_teams(org_id, site_id)
+  def fetch_all_jira_projects
+    all = []
+    start_at = 0
+
+    loop do
+      response = jira_get("/rest/api/3/project/search?maxResults=100&startAt=#{start_at}")
+      values = response.fetch("values", [])
+      all.concat(values)
+      start_at += values.length
+      break if start_at >= response.fetch("total", 0)
+      break if values.empty?
+    end
+
+    all
+  end
+
+  def fetch_all_teams
     teams = []
     cursor = nil
 
     loop do
-      query = ["siteId=#{url_encode(site_id)}"]
+      query = ["siteId=#{url_encode(@atlassian_site_id)}"]
       query << "cursor=#{url_encode(cursor)}" if present?(cursor)
-      response = jira_get("/gateway/api/public/teams/v1/org/#{org_id}/teams?#{query.join('&')}")
+      response = jira_get("/gateway/api/public/teams/v1/org/#{@atlassian_org_id}/teams?#{query.join('&')}")
       teams.concat(response.fetch("entities", []))
       cursor = response["cursor"]
       break unless present?(cursor)
@@ -169,51 +306,94 @@ class JiraSeeder
     teams
   end
 
-  def fetch_team_account_ids(org_id, site_id, team_ids)
+  def fetch_team_account_ids(team_id)
     account_ids = Set.new
+    after = nil
 
-    team_ids.each do |team_id|
-      after = nil
+    loop do
+      payload = { first: 50 }
+      payload[:after] = after if present?(after)
+      response = jira_post_json(
+        "/gateway/api/public/teams/v1/org/#{@atlassian_org_id}/teams/#{team_id}/members?siteId=#{@atlassian_site_id}",
+        payload
+      )
 
-      loop do
-        payload = { first: 50 }
-        payload[:after] = after if present?(after)
-        response = jira_post_json(
-          "/gateway/api/public/teams/v1/org/#{org_id}/teams/#{team_id}/members?siteId=#{site_id}",
-          payload
-        )
-
-        response.fetch("results", []).each do |member|
-          account_ids << member["accountId"] if present?(member["accountId"])
-        end
-
-        page_info = response.fetch("pageInfo", {})
-        break unless page_info["hasNextPage"]
-
-        after = page_info["endCursor"]
+      response.fetch("results", []).each do |member|
+        account_ids << member["accountId"] if present?(member["accountId"])
       end
+
+      page_info = response.fetch("pageInfo", {})
+      break unless page_info["hasNextPage"]
+
+      after = page_info["endCursor"]
     end
 
     account_ids.to_a
   end
 
+  def mapped_project_keys_for_team(team)
+    team_id = team.fetch("teamId")
+    team_name = team.fetch("displayName")
+
+    keys = @team_project_map[team_id] || @team_project_map[team_name]
+    if keys.nil? || keys.empty?
+      abort("No project mapping configured for Atlassian team '#{team_name}' (#{team_id}). Set ATLASSIAN_TEAM_PROJECT_KEYS_JSON.")
+    end
+
+    keys
+  end
+
+  def ensure_bandviz_teams_loaded
+    return unless @bandviz_team_by_name.empty?
+
+    teams = bandviz_get("/api/teams?activeOnly=false")
+    @bandviz_team_by_name = teams.each_with_object({}) { |team, acc| acc[team.fetch("name")] = team }
+  end
+
+  def parse_team_project_map
+    raw = ENV.fetch("ATLASSIAN_TEAM_PROJECT_KEYS_JSON", "").strip
+    return {} if raw.empty?
+
+    parsed = JSON.parse(raw)
+    unless parsed.is_a?(Hash)
+      abort("ATLASSIAN_TEAM_PROJECT_KEYS_JSON must be a JSON object")
+    end
+
+    parsed.each_with_object({}) do |(team_key, project_keys), acc|
+      unless project_keys.is_a?(Array) && project_keys.all? { |item| present?(item) }
+        abort("Mapping for '#{team_key}' must be an array of Jira project keys")
+      end
+      acc[team_key.to_s] = project_keys.map(&:to_s).map(&:strip).reject(&:empty?).uniq
+    end
+  rescue JSON::ParserError => e
+    abort("Failed to parse ATLASSIAN_TEAM_PROJECT_KEYS_JSON: #{e.message}")
+  end
+
   def project_changed?(existing, payload)
     existing["name"] != payload[:name] ||
       existing["jiraProjectKey"] != payload[:jiraProjectKey] ||
-      existing["targetUtilizationPct"] != payload[:targetUtilizationPct]
+      existing["targetUtilizationPct"] != payload[:targetUtilizationPct] ||
+      existing["deliveryMode"] != payload[:deliveryMode] ||
+      existing["teamId"] != payload[:teamId] ||
+      normalized_team_ids(existing["permittedTeamIds"]) != normalized_team_ids(payload[:permittedTeamIds])
+  end
+
+  def normalized_team_ids(values)
+    Array(values).map(&:to_i).uniq.sort
   end
 
   def developer_changed?(existing, payload)
     existing["name"] != payload[:name] ||
       existing["role"] != payload[:role] ||
       existing["weeklyCapacityHours"] != payload[:weeklyCapacityHours] ||
-      existing["jiraUsername"] != payload[:jiraUsername]
+      existing["jiraUsername"] != payload[:jiraUsername] ||
+      existing["teamId"] != payload[:teamId]
   end
 
-  def format_summary(resource, total, created, updated, skipped)
+  def summary(resource, total, created, updated, skipped)
     JSON.pretty_generate(
       resource: resource,
-      total_from_jira: total,
+      total_source: total,
       created: created,
       updated: updated,
       skipped: skipped,

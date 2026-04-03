@@ -68,7 +68,7 @@ public class JiraTicketService {
         if (teamId != null) {
             teamRepository.findById(teamId)
                     .orElseThrow(() -> new ResourceNotFoundException("Team not found: " + teamId));
-            List<String> projectKeys = projectRepository.findAllByActiveTrueAndTeamId(teamId).stream()
+            List<String> projectKeys = projectRepository.findDistinctByActiveTrueAndPermittedTeams_Id(teamId).stream()
                     .map(Project::getJiraProjectKey)
                     .filter(Objects::nonNull)
                     .filter(key -> !key.isBlank())

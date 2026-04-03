@@ -15,6 +15,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.Optional;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -80,8 +81,12 @@ class ProjectServiceTest {
         request.setColor("#2563eb");
         request.setTargetUtilizationPct(65);
         request.setDeliveryMode(ProjectDeliveryMode.SPRINT);
+        request.setTeamId(8L);
+
+        Team team = Team.builder().id(8L).name("Collections").active(true).build();
 
         when(projectRepository.findById(28L)).thenReturn(Optional.of(existing));
+        when(teamRepository.findById(8L)).thenReturn(Optional.of(team));
         when(projectRepository.save(any(Project.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         ProjectResponse response = projectService.update(28L, request);
@@ -99,5 +104,32 @@ class ProjectServiceTest {
         when(projectRepository.existsByName("Fullerton")).thenReturn(true);
 
         assertThrows(BusinessException.class, () -> projectService.create(request));
+    }
+
+    @Test
+    void create_shouldPersistPermittedTeams() {
+        ProjectRequest request = new ProjectRequest();
+        request.setName("Shared Platform");
+        request.setJiraProjectKey("SHRD");
+        request.setDeliveryMode(ProjectDeliveryMode.HYBRID);
+        request.setTeamId(8L);
+        request.setPermittedTeamIds(List.of(8L, 9L));
+
+        Team collections = Team.builder().id(8L).name("Collections").active(true).build();
+        Team platform = Team.builder().id(9L).name("Platform").active(true).build();
+
+        when(projectRepository.existsByName("Shared Platform")).thenReturn(false);
+        when(teamRepository.findById(8L)).thenReturn(Optional.of(collections));
+        when(teamRepository.findAllById(any())).thenReturn(List.of(collections, platform));
+        when(projectRepository.save(any(Project.class))).thenAnswer(invocation -> {
+            Project project = invocation.getArgument(0);
+            project.setId(51L);
+            return project;
+        });
+
+        ProjectResponse response = projectService.create(request);
+
+        assertEquals(51L, response.getId());
+        assertEquals(List.of(8L, 9L), response.getPermittedTeamIds());
     }
 }

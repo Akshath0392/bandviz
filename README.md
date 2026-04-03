@@ -16,8 +16,8 @@ BandViz now supports mixed delivery models:
 - Projects can be marked as `SPRINT`, `KANBAN`, or `HYBRID`
 
 Ownership hierarchy:
-- `Project -> Team -> Developer -> Tickets`
-- Projects can be assigned to a team
+- `Project (primary team + permitted teams) -> Team -> Developer -> Tickets`
+- Projects have one primary team owner and one or more permitted teams
 - Developers can be tagged to a team
 - Jira tickets can then be reviewed by developer, project, or team mapping
 
@@ -40,13 +40,20 @@ Ownership hierarchy:
 
 ## Prerequisites
 
-1. Java 21+ (`java -version` should show 21 or newer)
+1. Java 25+ (`java -version` should show 25 or newer)
 2. Maven 3.9+
 3. PostgreSQL running locally
 
 ## Environment Variables
 
-Set these before running:
+The app now auto-loads variables from a root `.env` file (recommended).
+You can start from `.env.example`:
+
+```bash
+cp .env.example .env
+```
+
+Equivalent manual exports:
 
 ```bash
 export DB_USERNAME=bandviz
@@ -108,13 +115,15 @@ From project root:
 ./mvnw spring-boot:run
 ```
 
+`application.yml` imports `optional:file:.env[.properties]`, so `.env` is picked up automatically when running from project root.
+
 Frontend note:
 - This repo now serves a React frontend directly from browser ES modules.
 - In this workspace, `node`/`npm` are not installed, so the React app does not use a local bundler yet.
 - React, ReactDOM, HTM, and Scheduler are vendored locally under `src/main/resources/static/react-app/vendor`.
 
 On startup:
-- Flyway applies `V1` to `V9` migrations
+- Flyway applies `V1` to latest migration (`V15` currently)
 - The schema is created without demo seed data
 
 ## Jira Seed Script
@@ -122,12 +131,16 @@ On startup:
 For repeatable Jira-based seeding, use:
 
 ```bash
-source ~/.zshrc
-./scripts/seed_from_jira.sh seed-all
+./scripts/seed_from_jira.sh seed-global
 ```
 
+Notes:
+- `scripts/seed_from_jira.sh` auto-loads `.env` from project root if present.
+- You can still override values by exporting env vars in your shell.
+
 Supported commands:
-- `seed-all`
+- `seed-global` (also supports legacy alias: `seed-all`)
+- `seed-teams`
 - `seed-projects`
 - `seed-developers`
 
@@ -141,23 +154,33 @@ Required env vars:
 Optional env vars:
 - `ATLASSIAN_TEAM_NAMES` comma-separated Atlassian team display names for developer seeding
 - `ATLASSIAN_TEAM_IDS` comma-separated fallback team IDs for developer seeding
+- `ATLASSIAN_TEAM_PROJECT_KEYS_JSON` JSON object mapping Atlassian team name or team id to Jira project keys
 - `BANDVIZ_BASE_URL` default: `http://localhost:8080`
 - `BANDVIZ_DEFAULT_DEVELOPER_ROLE` default: `DEVELOPER`
 - `BANDVIZ_DEFAULT_WEEKLY_CAPACITY` default: `40`
 - `BANDVIZ_DEFAULT_TARGET_UTILIZATION` default: `70`
+- `BANDVIZ_DEFAULT_DELIVERY_MODE` default: `HYBRID`
+- `ATLASSIAN_DUPLICATE_USER_TEAM_STRATEGY` values: `first` (default) or `error`
 - `DRY_RUN=true` to print summary without creating or updating records
 
 What it does:
-- Jira projects are fetched from `/rest/api/3/project/search` and upserted into BandViz by `jiraProjectKey`
-- Jira developers are fetched from one or more Atlassian team names or team IDs, resolved through `/rest/api/3/user`, and upserted into BandViz by email
+- Atlassian teams are fetched and upserted into BandViz `/api/teams`
+- Jira projects are fetched from `/rest/api/3/project/search` and upserted into BandViz by `jiraProjectKey` with mapped `teamId` (primary) and `permittedTeamIds`
+- Jira developers are fetched from selected Atlassian teams, resolved through `/rest/api/3/user`, and upserted into BandViz by email with `teamId`
 - Existing BandViz records are updated if the Jira-derived values changed
 
-Example developer seed config:
+Example global seed config:
 
 ```bash
 export ATLASSIAN_ORG_ID="your-org-id"
 export ATLASSIAN_SITE_ID="your-site-id"
 export ATLASSIAN_TEAM_NAMES="Collections BAU,Prod-Eng"
+export ATLASSIAN_TEAM_PROJECT_KEYS_JSON='{
+  "Collections BAU": ["COLL", "COLLTKT"],
+  "Prod-Eng": ["PE", "OPS"]
+}'
+
+./scripts/seed_from_jira.sh seed-global
 ```
 
 ## Access URLs
@@ -198,6 +221,7 @@ Developer payloads also support:
 Project payloads also support:
 - `deliveryMode` with values `SPRINT`, `KANBAN`, `HYBRID`
 - `teamId`
+- `permittedTeamIds` (optional list; `teamId` is always included automatically)
 
 ### Teams
 - `GET /api/teams`
@@ -212,9 +236,10 @@ Team payloads:
 
 Example flow for Collections:
 1. Create a team like `Collections BAU`
-2. Assign relevant projects to that team with `teamId`
-3. Tag developers to the same team with `teamId`
-4. Review synced Jira tickets through the same ownership chain
+2. Assign a project primary owner with `teamId`
+3. Add additional allowed teams with `permittedTeamIds` where needed
+4. Tag developers to their Jira-linked team with `teamId`
+5. Review synced Jira tickets through the same ownership chain
 
 ### Project Allocations
 - `GET /api/project-allocations?developerId={id}`
@@ -258,8 +283,6 @@ Behavior:
 - `POST /api/jira-sync/runs`
 - `GET /api/jira-sync/status`
 
-Legacy route aliases remain available for the older paths under `/api/assignments`, `/api/leaves`, `/api/bandwidth`, `/api/dashboard`, `/api/jira`, and `/api/sprints/active`.
-
 ## Testing
 
 ```bash
@@ -271,7 +294,7 @@ Legacy route aliases remain available for the older paths under `/api/assignment
 ## Troubleshooting
 
 ### `invalid flag: --release`
-You are using an unsupported Java version for this build. Use Java 21 or newer, but avoid compiling this project as Java 25 unless you also upgrade the Spring Boot plugin/toolchain.
+You are using an unsupported Java version for this build. Use Java 25+ (`java -version` should show 25 or newer).
 
 ### Flyway migration errors
 - Ensure DB is reachable and credentials are correct.

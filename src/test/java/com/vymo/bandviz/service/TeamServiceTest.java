@@ -3,6 +3,8 @@ package com.vymo.bandviz.service;
 import com.vymo.bandviz.domain.Team;
 import com.vymo.bandviz.dto.request.TeamRequest;
 import com.vymo.bandviz.exception.BusinessException;
+import com.vymo.bandviz.repository.DeveloperRepository;
+import com.vymo.bandviz.repository.ProjectRepository;
 import com.vymo.bandviz.repository.TeamRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -20,6 +22,12 @@ class TeamServiceTest {
 
     @Mock
     private TeamRepository teamRepository;
+
+    @Mock
+    private ProjectRepository projectRepository;
+
+    @Mock
+    private DeveloperRepository developerRepository;
 
     @InjectMocks
     private TeamService teamService;

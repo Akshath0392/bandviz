@@ -1,6 +1,8 @@
 spring:
   application:
     name: bandviz
+  config:
+    import: optional:file:.env[.properties]
 
   datasource:
     url: jdbc:postgresql://localhost:5432/bandviz

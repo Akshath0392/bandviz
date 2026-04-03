@@ -4,7 +4,9 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 @Entity
 @Table(name = "teams")
@@ -32,6 +34,10 @@ public class Team {
     @OneToMany(mappedBy = "team")
     @Builder.Default
     private List<Project> projects = new ArrayList<>();
+
+    @ManyToMany(mappedBy = "permittedTeams")
+    @Builder.Default
+    private Set<Project> permittedProjects = new LinkedHashSet<>();
 
     @OneToMany(mappedBy = "team")
     @Builder.Default

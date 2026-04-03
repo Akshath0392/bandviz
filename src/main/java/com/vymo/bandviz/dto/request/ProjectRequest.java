@@ -4,6 +4,8 @@ import com.vymo.bandviz.domain.enums.ProjectDeliveryMode;
 import jakarta.validation.constraints.*;
 import lombok.Data;
 
+import java.util.List;
+
 @Data
 public class ProjectRequest {
 
@@ -19,5 +21,8 @@ public class ProjectRequest {
 
     private ProjectDeliveryMode deliveryMode = ProjectDeliveryMode.HYBRID;
 
+    @NotNull
     private Long teamId;
+
+    private List<Long> permittedTeamIds;
 }
