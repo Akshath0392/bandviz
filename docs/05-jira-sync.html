@@ -95,6 +95,29 @@
     select.sm-select{padding:5px 8px;border-radius:6px;border:1px solid #d1d5db;font-size:12px;color:#374151}
     .toggle{width:36px;height:20px;border-radius:99px;background:#4f8ef7;position:relative;cursor:pointer;flex-shrink:0}
     .toggle::after{content:'';position:absolute;width:14px;height:14px;border-radius:50%;background:#fff;top:3px;right:3px;transition:.2s}
+    .toggle.off{background:#d1d5db}
+    .toggle.off::after{right:auto;left:3px}
+    /* FILTER SECTION */
+    .filter-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+    .filter-group{display:flex;flex-direction:column;gap:4px}
+    .filter-label{font-size:11px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.3px}
+    .filter-input{padding:7px 10px;border-radius:6px;border:1px solid #d1d5db;font-size:12px;color:#374151;background:#fff;width:100%}
+    .filter-input:focus{outline:none;border-color:#4f8ef7;box-shadow:0 0 0 2px rgba(79,142,247,.15)}
+    .filter-input::placeholder{color:#9ca3af}
+    select.filter-input{appearance:auto}
+    textarea.filter-input{min-height:60px;resize:vertical;font-family:monospace}
+    .filter-tag-wrap{display:flex;flex-wrap:wrap;gap:5px;margin-top:2px}
+    .filter-tag{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:500;background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe}
+    .filter-tag .tag-x{font-size:10px;cursor:pointer;color:#93c5fd;margin-left:2px}
+    .filter-tag .tag-x:hover{color:#1d4ed8}
+    .filter-preview{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px;margin-top:10px}
+    .filter-preview-label{font-size:10px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
+    .filter-preview-jql{font-family:monospace;font-size:11px;color:#334155;line-height:1.5;word-break:break-all}
+    .filter-active-count{background:#dbeafe;color:#1e40af;padding:2px 7px;border-radius:10px;font-size:10px;font-weight:700;margin-left:6px}
+    .filter-scope-bar{display:flex;gap:0;border:1px solid #d1d5db;border-radius:6px;overflow:hidden;font-size:11px}
+    .filter-scope-btn{padding:5px 12px;background:#fff;color:#6b7280;cursor:pointer;border:none;font-weight:500;transition:all .15s}
+    .filter-scope-btn.active{background:#4f8ef7;color:#fff;font-weight:600}
+    .filter-scope-btn:not(:last-child){border-right:1px solid #d1d5db}
     /* AVATAR COLORS */
     .av-1{background:#6366f1}.av-2{background:#ec4899}.av-3{background:#14b8a6}.av-4{background:#f59e0b}.av-5{background:#8b5cf6}
     .av-6{background:#ef4444}.av-7{background:#06b6d4}.av-8{background:#22c55e}.av-9{background:#f97316}
@@ -259,6 +282,113 @@
           </div>
         </div>
 
+        <!-- SYNC FILTERS -->
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Sync Filters <span class="filter-active-count">4 active</span></span>
+            <div style="display:flex;align-items:center;gap:10px">
+              <div class="filter-scope-bar">
+                <button class="filter-scope-btn active">Global</button>
+                <button class="filter-scope-btn">Per-Project</button>
+              </div>
+              <button class="btn btn-outline" style="padding:5px 10px;font-size:11px">Reset</button>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="filter-grid">
+              <div class="filter-group">
+                <label class="filter-label">Assignees</label>
+                <input class="filter-input" placeholder="e.g. arjun@vymo.com, neha@vymo.com" value=""/>
+                <div class="filter-tag-wrap">
+                  <span class="filter-tag">arjun@vymo.com <span class="tag-x">✕</span></span>
+                  <span class="filter-tag">neha@vymo.com <span class="tag-x">✕</span></span>
+                  <span class="filter-tag">divya@vymo.com <span class="tag-x">✕</span></span>
+                </div>
+              </div>
+              <div class="filter-group">
+                <label class="filter-label">Labels</label>
+                <input class="filter-input" placeholder="e.g. backend, P0-fix, sprint-42" value=""/>
+                <div class="filter-tag-wrap">
+                  <span class="filter-tag">backend <span class="tag-x">✕</span></span>
+                  <span class="filter-tag">critical-path <span class="tag-x">✕</span></span>
+                </div>
+              </div>
+              <div class="filter-group">
+                <label class="filter-label">Sprint</label>
+                <select class="filter-input">
+                  <option value="">All sprints</option>
+                  <option value="active" selected>Active sprint only</option>
+                  <option value="Sprint 42">Sprint 42</option>
+                  <option value="Sprint 41">Sprint 41</option>
+                  <option value="Sprint 40">Sprint 40</option>
+                  <option value="backlog">Backlog (no sprint)</option>
+                </select>
+              </div>
+              <div class="filter-group">
+                <label class="filter-label">Status Category</label>
+                <select class="filter-input">
+                  <option value="not-done" selected>Not Done (default)</option>
+                  <option value="all">All statuses</option>
+                  <option value="to-do">To Do only</option>
+                  <option value="in-progress">In Progress only</option>
+                </select>
+              </div>
+              <div class="filter-group">
+                <label class="filter-label">Components</label>
+                <input class="filter-input" placeholder="e.g. api-gateway, auth-service" value=""/>
+                <div class="filter-tag-wrap">
+                  <span class="filter-tag">api-gateway <span class="tag-x">✕</span></span>
+                </div>
+              </div>
+              <div class="filter-group">
+                <label class="filter-label">Issue Types</label>
+                <select class="filter-input" multiple style="min-height:auto;height:auto;padding:0">
+                  <option selected style="padding:4px 8px">Bug</option>
+                  <option selected style="padding:4px 8px">Story</option>
+                  <option selected style="padding:4px 8px">Task</option>
+                  <option style="padding:4px 8px">Epic</option>
+                  <option style="padding:4px 8px">Sub-task</option>
+                </select>
+              </div>
+              <div class="filter-group">
+                <label class="filter-label">Priority</label>
+                <select class="filter-input">
+                  <option value="" selected>All priorities</option>
+                  <option value="highest">Highest only</option>
+                  <option value="high-up">High & above</option>
+                  <option value="medium-up">Medium & above</option>
+                </select>
+              </div>
+              <div class="filter-group">
+                <label class="filter-label">Created After</label>
+                <input class="filter-input" type="date" value="2026-01-01"/>
+              </div>
+            </div>
+
+            <!-- Custom JQL Override -->
+            <div style="margin-top:16px">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+                <label class="filter-label">Custom JQL Override</label>
+                <span style="font-size:10px;color:#9ca3af">Overrides filters above when non-empty</span>
+              </div>
+              <textarea class="filter-input" placeholder='e.g. project = VYMO AND assignee IN (currentUser()) AND sprint IN openSprints() AND labels = "backend"'></textarea>
+            </div>
+
+            <!-- Generated JQL Preview -->
+            <div class="filter-preview">
+              <div class="filter-preview-label">Generated JQL Preview</div>
+              <div class="filter-preview-jql">
+                project = "VYMO" AND statusCategory != Done AND assignee IN ("arjun@vymo.com", "neha@vymo.com", "divya@vymo.com") AND labels IN ("backend", "critical-path") AND sprint IN openSprints() AND component = "api-gateway" AND issuetype IN (Bug, Story, Task) AND created &gt;= "2026-01-01" ORDER BY updated DESC
+              </div>
+            </div>
+
+            <div style="margin-top:14px;display:flex;gap:10px;justify-content:flex-end">
+              <button class="btn btn-outline">Preview Results</button>
+              <button class="btn btn-primary">Apply Filters &amp; Sync</button>
+            </div>
+          </div>
+        </div>
+
         <!-- SYNC LOG -->
         <div class="card card-last">
           <div class="card-header">
@@ -334,6 +464,90 @@
               <span class="dtb-name">Vikram K.</span>
               <div class="dtb-bar-wrap"><div class="dtb-bar" style="width:25%"></div></div>
               <span class="dtb-count">2</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- ACTIVE FILTER SUMMARY -->
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Active Filters</span>
+            <span class="filter-active-count">4</span>
+          </div>
+          <div class="card-body" style="padding-top:8px;padding-bottom:8px">
+            <div class="config-row" style="padding:8px 0">
+              <div>
+                <div class="config-label" style="font-size:12px">Assignees</div>
+                <div class="config-sub">3 people selected</div>
+              </div>
+              <span style="font-size:18px;cursor:pointer;color:#9ca3af">✎</span>
+            </div>
+            <div class="config-row" style="padding:8px 0">
+              <div>
+                <div class="config-label" style="font-size:12px">Labels</div>
+                <div class="config-sub">backend, critical-path</div>
+              </div>
+              <span style="font-size:18px;cursor:pointer;color:#9ca3af">✎</span>
+            </div>
+            <div class="config-row" style="padding:8px 0">
+              <div>
+                <div class="config-label" style="font-size:12px">Sprint</div>
+                <div class="config-sub">Active sprint only</div>
+              </div>
+              <span style="font-size:18px;cursor:pointer;color:#9ca3af">✎</span>
+            </div>
+            <div class="config-row" style="padding:8px 0">
+              <div>
+                <div class="config-label" style="font-size:12px">Components</div>
+                <div class="config-sub">api-gateway</div>
+              </div>
+              <span style="font-size:18px;cursor:pointer;color:#9ca3af">✎</span>
+            </div>
+            <div class="config-row" style="padding:8px 0;border-bottom:none">
+              <div>
+                <div class="config-label" style="font-size:12px">Scope</div>
+                <div class="config-sub">Global (all projects)</div>
+              </div>
+              <span style="font-size:11px;color:#4f8ef7;cursor:pointer;font-weight:500">Change</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- PER-PROJECT FILTER OVERRIDES -->
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Per-Project Overrides</span>
+          </div>
+          <div class="card-body" style="padding-top:8px;padding-bottom:8px">
+            <div class="config-row" style="padding:8px 0">
+              <div>
+                <div style="display:flex;align-items:center;gap:6px">
+                  <span class="jira-key" style="font-size:10px;padding:1px 6px">VYMO</span>
+                  <span class="config-label" style="font-size:12px">CRM Core</span>
+                </div>
+                <div class="config-sub">+label: crm-module · +assignee: priya@vymo.com</div>
+              </div>
+              <span style="font-size:18px;cursor:pointer;color:#9ca3af">✎</span>
+            </div>
+            <div class="config-row" style="padding:8px 0">
+              <div>
+                <div style="display:flex;align-items:center;gap:6px">
+                  <span class="jira-key" style="font-size:10px;padding:1px 6px">MOB</span>
+                  <span class="config-label" style="font-size:12px">Mobile SDK</span>
+                </div>
+                <div class="config-sub">+issuetype: Bug only · +priority: High &amp; above</div>
+              </div>
+              <span style="font-size:18px;cursor:pointer;color:#9ca3af">✎</span>
+            </div>
+            <div class="config-row" style="padding:8px 0;border-bottom:none">
+              <div>
+                <div style="display:flex;align-items:center;gap:6px">
+                  <span class="jira-key" style="font-size:10px;padding:1px 6px">ANA</span>
+                  <span class="config-label" style="font-size:12px">Analytics 2.0</span>
+                </div>
+                <div class="config-sub" style="color:#9ca3af;font-style:italic">Using global filters</div>
+              </div>
+              <span style="font-size:11px;color:#4f8ef7;cursor:pointer;font-weight:500">Add</span>
             </div>
           </div>
         </div>
